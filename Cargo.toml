@@ -9,7 +9,15 @@ edition = "2021"
 # rand = "0.8.5"
 # crc16 = "0.4.0"
 crc = "3.0.1"
-byteorder = "1.5.0"
-bincode = "1.3.3"
-serde = "1.0.195"
+# byteorder = "1.5.0"
+# bincode = "1.3.3"
+# serde = "1.0.195"
 crc32fast = "1.3.2"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "serialize_benchmark"
+harness = false
+
