@@ -1,12 +1,12 @@
-use std::net::UdpSocket;
+// use std::net::UdpSocket;
 // use lidar_rs::network_frame::{CmdType, ControlFrame, Cmd};
 // use lidar_rs::network_frame::ControlFrame;
-pub struct ShakeCmd {
-    user_ip: u8,
-    data_port: u16,
-    cmd_port: u16,
-    imu_port: u16,
-}
+// pub struct ShakeCmd {
+//     user_ip: u8,
+//     data_port: u16,
+//     cmd_port: u16,
+//     imu_port: u16,
+// }
 
 
 
