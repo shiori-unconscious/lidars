@@ -51,7 +51,7 @@ pub mod control_frame {
     use super::*;
 
     pub trait Serialize {
-        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
+        fn serialize(&self) -> Result<Vec<u8>>;
     }
 
     pub trait Deserialize {
@@ -68,9 +68,8 @@ pub mod control_frame {
     }
 
     impl Serialize for Cmd {
-        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-            writer.write_all(&[self.cmd_set, self.cmd_id])?;
-            Ok(())
+        fn serialize(&self) -> Result<Vec<u8>> {
+            Ok(vec![self.cmd_set, self.cmd_id])
         }
     }
 
@@ -80,11 +79,11 @@ pub mod control_frame {
                 return Err(anyhow!(
                     concat!(
                         "Cannot deserialize the serial due to an incompatible length:",
-                        "the length of the serial is {}, ",
+                        "the length of the serial is {}, ", 
                         "while the length of the <Cmd> frame is {}."
                     ),
                     buffer.len(),
-                    mem::size_of_val(self)
+                    mem::size_of_val(self),
                 ));
             }
             (self.cmd_set, self.cmd_id) = (buffer[0], buffer[1]);
@@ -120,12 +119,13 @@ pub mod control_frame {
     }
 
     impl Serialize for Broadcast {
-        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-            self.cmd.serialize(writer)?;
-            writer.write_all(&self.broadcast_code)?;
-            writer.write_all(&[self.dev_type])?;
-            writer.write_all(&self._reserved.to_le_bytes())?;
-            Ok(())
+        fn serialize(&self) -> Result<Vec<u8>> {
+            let mut buf = Vec::with_capacity(Self::len() as usize);
+            buf.extend(self.cmd.serialize()?);
+            buf.extend(self.broadcast_code);
+            buf.push(self.dev_type);
+            buf.extend(self._reserved.to_le_bytes());
+            Ok(buf)
         }
     }
 
@@ -139,7 +139,7 @@ pub mod control_frame {
                         "while the length of the <Broadcast> frame is {}."
                     ),
                     buffer.len(),
-                    mem::size_of_val(self)
+                    mem::size_of_val(self),
                 ));
             }
             self.cmd.deserialize(&buffer[..2])?;
@@ -185,7 +185,7 @@ pub mod control_frame {
     where
         T: Serialize + Len,
     {
-        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        fn serialize(&self) -> Result<Vec<u8>> {
             let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
             let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
 
@@ -210,16 +210,14 @@ pub mod control_frame {
             buf.extend(digest16.finalize().to_le_bytes());
             
             // seralize data segment
-            self.data.serialize(&mut buf)?;
-            
+            buf.extend(self.data.serialize()?);
+
             // calculate CRC32
             digest32.update(&buf);
 
             buf.extend(digest32.finalize().to_le_bytes());
 
-            writer.write_all(&buf)?;
-
-            Ok(())
+            Ok(buf)
         }
     }
 
