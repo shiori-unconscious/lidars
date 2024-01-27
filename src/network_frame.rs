@@ -22,7 +22,6 @@ The module is intended to be used as a part of the lidar system for network comm
 
 use anyhow::{anyhow, Result};
 use crc::{self, Crc, CRC_16_MCRF4XX};
-use crc32fast::Hasher;
 use std::io::Write;
 use std::mem;
 
@@ -51,14 +50,14 @@ pub mod control_frame {
     use super::*;
 
     pub trait Serialize {
-        fn serialize(&self) -> Result<Vec<u8>>;
+        fn serialize<W:Write>(&self, writer: &mut W) -> Result<()>;
     }
 
     pub trait Deserialize {
         fn deserialize(&mut self, buffer: &[u8]) -> Result<()>;
     }
 
-    trait Len {
+    pub trait Len {
         fn len() -> u16;
     }
 
@@ -68,8 +67,9 @@ pub mod control_frame {
     }
 
     impl Serialize for Cmd {
-        fn serialize(&self) -> Result<Vec<u8>> {
-            Ok(vec![self.cmd_set, self.cmd_id])
+        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+            writer.write_all(&[self.cmd_set, self.cmd_id])?;
+            Ok(())
         }
     }
 
@@ -119,13 +119,12 @@ pub mod control_frame {
     }
 
     impl Serialize for Broadcast {
-        fn serialize(&self) -> Result<Vec<u8>> {
-            let mut buf = Vec::with_capacity(Self::len() as usize);
-            buf.extend(self.cmd.serialize()?);
-            buf.extend(self.broadcast_code);
-            buf.push(self.dev_type);
-            buf.extend(self._reserved.to_le_bytes());
-            Ok(buf)
+        fn serialize<W: Write>(&self, writer:&mut W) -> Result<()> {
+            self.cmd.serialize(writer)?;
+            writer.write_all(&self.broadcast_code)?;
+            writer.write_all(&[self.dev_type])?;
+            writer.write_all(&self._reserved.to_le_bytes())?;
+            Ok(())
         }
     }
 
@@ -155,11 +154,6 @@ pub mod control_frame {
             return (mem::size_of::<u8>() * 17 + mem::size_of::<u16>()) as u16 + Cmd::len();
         }
     }
-    // impl Serialize for () {
-    //     fn serialize<W: Write>(&self, _: &mut W) -> Result<()> {
-    //         Ok(())
-    //     }
-    // }
 
     pub struct ControlFrame<T> {
         sof: u8,
@@ -178,46 +172,6 @@ pub mod control_frame {
                 seq_num,
                 data,
             }
-        }
-    }
-
-    impl<T> Serialize for ControlFrame<T>
-    where
-        T: Serialize + Len,
-    {
-        fn serialize(&self) -> Result<Vec<u8>> {
-            let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
-            let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
-
-            let mut digest32 = Hasher::new_with_initial(CRC32_INIT);
-
-            let buffer_len =
-                Self::len() + LEN_OF_LENGTH_FIELD + LEN_OF_CRC16_FIELD + LEN_OF_CRC32_FIELD;
-
-            let mut buf = Vec::with_capacity(buffer_len as usize);
-
-            buf.push(self.sof);
-            buf.push(self.version);
-
-            // length of dataframe
-            buf.extend((buffer_len).to_le_bytes());
-            buf.push(self.cmd_type as u8);
-
-            buf.extend(self.seq_num.to_le_bytes());
-            
-            // calculate CRC16
-            digest16.update(&buf);
-            buf.extend(digest16.finalize().to_le_bytes());
-            
-            // seralize data segment
-            buf.extend(self.data.serialize()?);
-
-            // calculate CRC32
-            digest32.update(&buf);
-
-            buf.extend(digest32.finalize().to_le_bytes());
-
-            Ok(buf)
         }
     }
 
@@ -246,7 +200,7 @@ pub mod control_frame {
                 return Err(anyhow!("Crc16 for header of <ControlFrame> failed"));
             }
 
-            let mut digest32 = Hasher::new_with_initial(CRC32_INIT);
+            let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
             digest32.update(&buffer[..len - 4]);
             if digest32.finalize() != u32::from_le_bytes(buffer[len - 4..].try_into()?) {
                 return Err(anyhow!("Crc32 for frame of <ControlFrame> failed"));
@@ -275,6 +229,46 @@ pub mod control_frame {
             return (mem::size_of::<u8>() * 2 + mem::size_of::<CmdType>() + mem::size_of::<u16>())
                 as u16
                 + Broadcast::len();
+        }
+    }
+
+    impl<T> ControlFrame<T>
+    where
+        T: Serialize + Len,
+    {
+        pub fn serialize(&self) -> Result<Vec<u8>> {
+            let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
+            let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
+
+            let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
+
+            let buffer_len =
+                Self::len() + LEN_OF_LENGTH_FIELD + LEN_OF_CRC16_FIELD + LEN_OF_CRC32_FIELD;
+
+            let mut buf = Vec::with_capacity(buffer_len as usize);
+
+            buf.push(self.sof);
+            buf.push(self.version);
+
+            // length of dataframe
+            buf.extend((buffer_len).to_le_bytes());
+            buf.push(self.cmd_type as u8);
+
+            buf.extend(self.seq_num.to_le_bytes());
+            
+            // calculate CRC16
+            digest16.update(&buf);
+            buf.extend(digest16.finalize().to_le_bytes());
+            
+            // seralize data segment
+            // buf.extend(self.data.serialize()?);
+            self.data.serialize(&mut buf)?;
+            // calculate CRC32
+            digest32.update(&buf);
+
+            buf.extend(digest32.finalize().to_le_bytes());
+
+            Ok(buf)
         }
     }
 }
