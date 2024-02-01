@@ -8,6 +8,7 @@ use std::net::Ipv4Addr;
 use serde::{Deserialize, Serialize};
 
 use super::*;
+
 const CRC16_INIT: u16 = 0x9232;
 const CRC32_INIT: u32 = 0x501af26a;
 const LEN_OF_LENGTH_FIELD: u16 = 2;
@@ -274,7 +275,7 @@ mod tests {
             0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x0, 0x45, 0x11, 0x9E, 0xBE,
             0x83, 0x49,
         ];
-        control_frame.deserialize(&serial);
+        control_frame.deserialize(&serial).unwrap();
         assert_eq!(control_frame.sof, 0xAA);
         assert_eq!(control_frame.version, 0x1);
         assert_eq!(control_frame.cmd_type, CmdType::Cmd);
