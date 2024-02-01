@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion}; 
-use lidar_rs::network_frame::control_frame::{Broadcast, ControlFrame, Deserialize};
+use lidar_rs::network_frame::control_frame::{Broadcast, ControlFrame};
 use lidar_rs::network_frame::CmdType;
 
 

@@ -24,72 +24,72 @@ use anyhow::{anyhow, Result};
 use crc::{self, Crc, CRC_16_MCRF4XX};
 use std::io::Write;
 use std::mem;
-
-const CRC16_INIT: u16 = 0x4c49;
-const CRC32_INIT: u32 = 0x564f580a;
+use bincode::{serialize,deserialize};
+const CRC16_INIT: u16 = 0x9232;
+// const CRC32_INIT: u32 = 0x564f580a;
+const CRC32_INIT: u32 = 0x501af26a;
 const LEN_OF_LENGTH_FIELD: u16 = 2;
 const LEN_OF_CRC16_FIELD: u16 = 2;
 const LEN_OF_CRC32_FIELD: u16 = 4;
 
 /// enumeration of command types
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CmdType {
     Cmd,
     Ack,
     Msg,
 }
-/**
-```
-let broadcast_frame = ControlFrame::new(CmdType::Cmd, 0x1145, Broadcast::new());
-let buffer = Vec::new();
-broadcast_frame.serialize(&mut buffer);
-```
-*/
+
 pub mod control_frame {
+
+    use std::net::Ipv4Addr;
+
+    use serde::{Deserialize, Serialize, Serializer};
 
     use super::*;
 
-    pub trait Serialize {
-        fn serialize<W:Write>(&self, writer: &mut W) -> Result<()>;
-    }
+    // pub trait Serialize {
+    //     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
+    // }
 
-    pub trait Deserialize {
-        fn deserialize(&mut self, buffer: &[u8]) -> Result<()>;
-    }
+    // pub trait Deserialize {
+    //     fn deserialize(&mut self, buffer: &[u8]) -> Result<()>;
+    // }
 
     pub trait Len {
         fn len() -> u16;
     }
 
+    #[derive(Debug,Serialize,Deserialize)]
     pub struct Cmd {
         cmd_set: u8,
         cmd_id: u8,
     }
 
-    impl Serialize for Cmd {
-        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-            writer.write_all(&[self.cmd_set, self.cmd_id])?;
-            Ok(())
-        }
-    }
+    // impl Serialize for Cmd {
+    //     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+    //         writer.write_all(&[self.cmd_set, self.cmd_id])?;
+    //         Ok(())
+    //     }
+    // }
 
-    impl Deserialize for Cmd {
-        fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
-            if buffer.len() as u16 != Self::len() {
-                return Err(anyhow!(
-                    concat!(
-                        "Cannot deserialize the serial due to an incompatible length:",
-                        "the length of the serial is {}, ", 
-                        "while the length of the <Cmd> frame is {}."
-                    ),
-                    buffer.len(),
-                    mem::size_of_val(self),
-                ));
-            }
-            (self.cmd_set, self.cmd_id) = (buffer[0], buffer[1]);
-            Ok(())
-        }
-    }
+    // impl Deserialize for Cmd {
+    //     fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
+    //         if buffer.len() as u16 != Self::len() {
+    //             return Err(anyhow!(
+    //                 concat!(
+    //                     "Cannot deserialize the serial due to an incompatible length:",
+    //                     "the length of the serial is {}, ",
+    //                     "while the length of the <Cmd> frame is {}."
+    //                 ),
+    //                 buffer.len(),
+    //                 Self::len(),
+    //             ));
+    //         }
+    //         (self.cmd_set, self.cmd_id) = (buffer[0], buffer[1]);
+    //         Ok(())
+    //     }
+    // }
 
     impl Len for Cmd {
         fn len() -> u16 {
@@ -97,6 +97,7 @@ pub mod control_frame {
         }
     }
 
+    #[derive(Debug,Serialize,Deserialize)]
     pub struct Broadcast {
         cmd: Cmd,
         broadcast_code: [u8; 16],
@@ -118,36 +119,36 @@ pub mod control_frame {
         }
     }
 
-    impl Serialize for Broadcast {
-        fn serialize<W: Write>(&self, writer:&mut W) -> Result<()> {
-            self.cmd.serialize(writer)?;
-            writer.write_all(&self.broadcast_code)?;
-            writer.write_all(&[self.dev_type])?;
-            writer.write_all(&self._reserved.to_le_bytes())?;
-            Ok(())
-        }
-    }
+    // impl Serialize for Broadcast {
+    //     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+    //         self.cmd.serialize(writer)?;
+    //         writer.write_all(&self.broadcast_code)?;
+    //         writer.write_all(&[self.dev_type])?;
+    //         writer.write_all(&self._reserved.to_le_bytes())?;
+    //         Ok(())
+    //     }
+    // }
 
-    impl Deserialize for Broadcast {
-        fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
-            if buffer.len() as u16 != Self::len() {
-                return Err(anyhow!(
-                    concat!(
-                        "Cannot deserialize the serial due to an incompatible length:",
-                        "the length of the serial is {}, ",
-                        "while the length of the <Broadcast> frame is {}."
-                    ),
-                    buffer.len(),
-                    mem::size_of_val(self),
-                ));
-            }
-            self.cmd.deserialize(&buffer[..2])?;
-            self.broadcast_code.copy_from_slice(&buffer[2..18]);
-            self.dev_type = buffer[18];
-            self._reserved = u16::from_le_bytes(buffer[19..=20].try_into()?);
-            Ok(())
-        }
-    }
+    // impl Deserialize for Broadcast {
+    //     fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
+    //         if buffer.len() as u16 != Self::len() {
+    //             return Err(anyhow!(
+    //                 concat!(
+    //                     "Cannot deserialize the serial due to an incompatible length:",
+    //                     "the length of the serial is {}, ",
+    //                     "while the length of the <Broadcast> frame is {}."
+    //                 ),
+    //                 buffer.len(),
+    //                 Self::len(),
+    //             ));
+    //         }
+    //         self.cmd.deserialize(&buffer[..2])?;
+    //         self.broadcast_code.copy_from_slice(&buffer[2..18]);
+    //         self.dev_type = buffer[18];
+    //         self._reserved = u16::from_le_bytes(buffer[19..=20].try_into()?);
+    //         Ok(())
+    //     }
+    // }
 
     impl Len for Broadcast {
         fn len() -> u16 {
@@ -155,6 +156,85 @@ pub mod control_frame {
         }
     }
 
+    #[derive(Debug,Serialize,Deserialize)]
+    pub struct Handshake {
+        cmd: Cmd,
+        user_ip: Ipv4Addr,
+        data_port: u16,
+        cmd_port: u16,
+        imu_port: u16,
+    }
+
+    impl Handshake {
+        pub fn new(user_ip: Ipv4Addr, data_port: u16, cmd_port: u16, imu_port: u16) -> Self {
+            Handshake {
+                cmd: Cmd {
+                    cmd_set: 0x00,
+                    cmd_id: 0x01,
+                },
+                user_ip,
+                data_port,
+                cmd_port,
+                imu_port,
+            }
+        }
+    }
+
+    // impl Serialize for Handshake {
+    //     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+    //         self.cmd.serialize(writer)?;
+    //         writer.write_all(&self.user_ip.octets())?;
+    //         writer.write_all(&self.data_port.to_le_bytes())?;
+    //         writer.write_all(&self.cmd_port.to_le_bytes())?;
+    //         writer.write_all(&self.imu_port.to_le_bytes())?;
+    //         Ok(())
+    //     }
+    // }
+
+    // impl Deserialize for Handshake {
+    //     fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
+    //         if buffer.len() as u16 != Self::len() {
+    //             return Err(anyhow!(
+    //                 concat!(
+    //                     "Cannot deserialize the serial due to an incompatible length:",
+    //                     "the length of the serial is {}, ",
+    //                     "while the length of the <Handshake> frame is {}."
+    //                 ),
+    //                 buffer.len(),
+    //                 Self::len(),
+    //             ));
+    //         }
+    //         self.cmd.deserialize(&buffer[..2])?;
+    //         self.user_ip = Ipv4Addr::new(buffer[2], buffer[3], buffer[4], buffer[5]);
+    //         self.data_port = u16::from_le_bytes(buffer[6..=7].try_into()?);
+    //         self.cmd_port = u16::from_le_bytes(buffer[8..=9].try_into()?);
+    //         self.imu_port = u16::from_le_bytes(buffer[10..=11].try_into()?);
+    //         Ok(())
+    //     }
+    // }
+
+    impl Len for Handshake {
+        fn len() -> u16 {
+            return (mem::size_of::<u8>() * 6 + mem::size_of::<u16>() * 3) as u16 + Cmd::len();
+        }
+    }
+
+    pub struct Heartbeat {
+        cmd: Cmd,
+    }
+
+    impl Heartbeat {
+        fn new() -> Self {
+            Heartbeat {
+                cmd: Cmd {
+                    cmd_set: 0x00,
+                    cmd_id: 0x02,
+                },
+            }
+        }
+    }
+
+    #[derive(Debug)]
     pub struct ControlFrame<T> {
         sof: u8,
         version: u8,
@@ -175,68 +255,11 @@ pub mod control_frame {
         }
     }
 
-    impl<T> Deserialize for ControlFrame<T>
-    where
-        T: Deserialize,
-    {
-        fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
-            let len = u16::from_le_bytes(buffer[2..=3].try_into()?) as usize;
-            if buffer.len() != len {
-                return Err(anyhow!(
-                    concat!(
-                        "Cannot deserialize the serial due to an incompatible length:",
-                        "the length of the serial is {}, ",
-                        "while the length of the <ControlFrame> frame is {}."
-                    ),
-                    buffer.len(),
-                    len,
-                ));
-            }
-
-            let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
-            let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
-            digest16.update(&buffer[..7]);
-            if digest16.finalize() != u16::from_le_bytes(buffer[7..=8].try_into()?) {
-                return Err(anyhow!("Crc16 for header of <ControlFrame> failed"));
-            }
-
-            let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
-            digest32.update(&buffer[..len - 4]);
-            if digest32.finalize() != u32::from_le_bytes(buffer[len - 4..].try_into()?) {
-                return Err(anyhow!("Crc32 for frame of <ControlFrame> failed"));
-            }
-
-            self.sof = buffer[0];
-            self.version = buffer[1];
-            self.cmd_type = match buffer[4] {
-                0x00 => CmdType::Cmd,
-                0x01 => CmdType::Ack,
-                0x02 => CmdType::Msg,
-                otherwise => return Err(anyhow!("Unknown command type {otherwise}")),
-            };
-            self.seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
-            self.data.deserialize(&buffer[9..len - 4])?;
-
-            Ok(())
-        }
-    }
-
-    impl<T> Len for ControlFrame<T>
-    where
-        T: Len,
-    {
-        fn len() -> u16 {
-            return (mem::size_of::<u8>() * 2 + mem::size_of::<CmdType>() + mem::size_of::<u16>())
-                as u16
-                + Broadcast::len();
-        }
-    }
-
-    impl<T> ControlFrame<T>
-    where
-        T: Serialize + Len,
-    {
-        pub fn serialize(&self) -> Result<Vec<u8>> {
+    impl<T> ControlFrame<T> {
+        pub fn serialize(&self) -> Result<Vec<u8>>
+        where
+            T: Serialize + Len,
+        {
             let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
             let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
 
@@ -255,20 +278,99 @@ pub mod control_frame {
             buf.push(self.cmd_type as u8);
 
             buf.extend(self.seq_num.to_le_bytes());
-            
+
             // calculate CRC16
             digest16.update(&buf);
             buf.extend(digest16.finalize().to_le_bytes());
-            
+
             // seralize data segment
-            // buf.extend(self.data.serialize()?);
-            self.data.serialize(&mut buf)?;
+            // self.data.serialize(&mut buf)?;
+            buf.extend(serialize(&self.data).map_err(|e| anyhow!("Failed to serialize data segment: {}", e))?);
+            
             // calculate CRC32
             digest32.update(&buf);
 
             buf.extend(digest32.finalize().to_le_bytes());
 
             Ok(buf)
+        }
+
+        pub fn deserialize<'a>(&mut self, buffer: &'a [u8]) -> Result<()>
+        where
+            T: Deserialize<'a>,
+        {
+            let len = u16::from_le_bytes(buffer[2..=3].try_into()?) as usize;
+            if buffer.len() != len {
+                return Err(anyhow!(
+                    concat!(
+                        "Cannot deserialize the serial due to an incompatible length:",
+                        "the length of the serial is {}, ",
+                        "while the length of the <ControlFrame> frame is {}."
+                    ),
+                    buffer.len(),
+                    len,
+                ));
+            }
+
+            let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
+            let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
+            digest16.update(&buffer[..7]);
+            let checksum_recv = u16::from_le_bytes(buffer[7..=8].try_into()?);
+            let checksum_cal = digest16.finalize();
+            if checksum_cal != checksum_recv {
+                return Err(anyhow!(
+                    concat!(
+                        "Crc16 for header of <ControlFrame> failed",
+                        "checksum received is 0x{:X?}, ",
+                        "while the calculated checksum is 0x{:X?}.",
+                    ),
+                    checksum_recv,
+                    checksum_cal
+                ));
+            }
+
+            let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
+            digest32.update(&buffer[..len - 4]);
+
+            let checksum_recv = u32::from_le_bytes(buffer[len - 4..].try_into()?);
+            let checksum_cal = digest32.finalize();
+
+            if checksum_cal != checksum_recv {
+                return Err(anyhow!(
+                    concat!(
+                        "Crc32 for frame of <ControlFrame> failed",
+                        "checksum received is {:X?}, ",
+                        "while the calculated checksum is {:X?}.",
+                    ),
+                    checksum_recv,
+                    checksum_cal
+                ));
+            }
+
+            self.sof = buffer[0];
+            self.version = buffer[1];
+            self.cmd_type = match buffer[4] {
+                0x00 => CmdType::Cmd,
+                0x01 => CmdType::Ack,
+                0x02 => CmdType::Msg,
+                otherwise => return Err(anyhow!("Unknown command type {otherwise}")),
+            };
+            self.seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
+            self.data = deserialize(&buffer[9..len-4])?;
+            // self.data.deserialize(&buffer[9..len - 4])?;
+
+            Ok(())
+        }
+    }
+
+    impl<T> Len for ControlFrame<T>
+    where
+        T: Len,
+    {
+        fn len() -> u16 {
+            return (mem::size_of::<u8>() * 2 + mem::size_of::<CmdType>() + mem::size_of::<u16>())
+                as u16
+                + Broadcast::len();
         }
     }
 }
