@@ -1,21 +1,17 @@
-use anyhow::Result;
-use crc::{Crc, CRC_16_MCRF4XX};
-use lidar_rs::network_frame::control_frame::{Broadcast,ControlFrame};
-use lidar_rs::network_frame::CmdType;
+use lidar_rs::network_frame::control_frame::{ControlFrame, WriteFlashReq};
 use std::net::UdpSocket;
 
+fn main() {
+    let read_from = ControlFrame::new(0x11, WriteFlashReq::new(false, true, 0x08));
+    // let mut write_to = ControlFrame::new(CmdType::Cmd, 0x11, Broadcast::new());
+    // let test_buffer = read_from.serialize().unwrap();
 
-fn main(){
-	let read_from = ControlFrame::new(CmdType::Cmd, 0x11, Broadcast::new());
-    let mut write_to = ControlFrame::new(CmdType::Cmd, 0x11, Broadcast::new());
-    let test_buffer = read_from.serialize().unwrap();
+    println!("{:?}", read_from);
 
-	println!("{:?}", read_from);
-
-	let buffer = read_from.serialize().unwrap();
-	println!("{:X?}", buffer);
-	write_to.deserialize(&buffer).unwrap();
-	println!("{:?}",write_to);
+    let buffer = read_from.serialize().unwrap();
+    println!("{:X?}", buffer);
+    // write_to.deserialize(&buffer).unwrap();
+    // println!("{:?}",write_to);
 }
 // fn main() -> Result<()> {
 //     let socket = UdpSocket::bind("255.255.255.255:55000")?;
