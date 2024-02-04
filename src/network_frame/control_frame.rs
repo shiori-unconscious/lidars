@@ -1,17 +1,15 @@
 use anyhow::{anyhow, Result};
-use bincode::{deserialize, serialize, serialize_into};
-use crc::{self, Crc, CRC_16_MCRF4XX};
-use std::{cmp, mem};
+use bincode::{deserialize, serialize_into};
+use crc::{Crc, CRC_16_MCRF4XX};
+use std::mem;
 
-use serde::{
-    ser::{SerializeSeq, SerializeStruct},
-    Deserialize, Serialize,
-};
+use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 
 use super::cfg::*;
 
 const CRC16_INIT: u16 = 0x9232;
 const CRC32_INIT: u32 = 0x501af26a;
+
 const LEN_OF_LENGTH_FIELD: u16 = 2;
 const LEN_OF_CRC16_FIELD: u16 = 2;
 const LEN_OF_CRC32_FIELD: u16 = 4;
@@ -108,6 +106,17 @@ pub const WRITE_FLASH_REQ: WriteFlashReq = WriteFlashReq {
     slot_id: 0x01,
 };
 
+/// Read outer parameters of lidar
+pub const READ_OUTER_PARAMETERS: ReadOuterParameters = ReadOuterParameters(Cmd {
+    cmd_set: 0x01,
+    cmd_id: 0x02,
+});
+
+pub const GET_RETURN_MODE: GetReturnMode = GetReturnMode(Cmd {
+    cmd_set: 0x01,
+    cmd_id: 0x07,
+});
+
 /// Constantly offer length of data fragment for serialization constant
 pub trait Len {
     fn len() -> u16;
@@ -122,7 +131,7 @@ pub struct Cmd {
 
 impl Len for Cmd {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() * 2) as u16;
+        (mem::size_of::<u8>() * 2) as u16
     }
 }
 
@@ -147,7 +156,7 @@ pub struct HandshakeReq {
 
 impl Len for HandshakeReq {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() * 6 + mem::size_of::<u16>() * 3) as u16 + Cmd::len();
+        (mem::size_of::<u8>() * 6 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
     }
 }
 
@@ -157,7 +166,7 @@ pub struct DeviceInfoReq(Cmd);
 
 impl Len for DeviceInfoReq {
     fn len() -> u16 {
-        return Cmd::len();
+        Cmd::len()
     }
 }
 
@@ -167,7 +176,7 @@ pub struct HeartbeatReq(Cmd);
 
 impl Len for HeartbeatReq {
     fn len() -> u16 {
-        return Cmd::len();
+        Cmd::len()
     }
 }
 
@@ -180,7 +189,7 @@ pub struct SampleCtrlReq {
 
 impl Len for SampleCtrlReq {
     fn len() -> u16 {
-        return mem::size_of::<u8>() as u16 + Cmd::len();
+        mem::size_of::<u8>() as u16 + Cmd::len()
     }
 }
 
@@ -193,7 +202,7 @@ pub struct ChangeCoordinateReq {
 
 impl Len for ChangeCoordinateReq {
     fn len() -> u16 {
-        return mem::size_of::<u8>() as u16 + Cmd::len();
+        mem::size_of::<u8>() as u16 + Cmd::len()
     }
 }
 
@@ -203,13 +212,13 @@ pub struct DisconnectReq(Cmd);
 
 impl Len for DisconnectReq {
     fn len() -> u16 {
-        return Cmd::len();
+        Cmd::len()
     }
 }
 
 /// Configure ip address, net mask and gateway address
 #[derive(Debug, Serialize)]
-struct IpConfigReq {
+pub struct IpConfigReq {
     cmd: Cmd,
     ip_mode: u8,
     ip_addr: u32,
@@ -234,7 +243,7 @@ impl IpConfigReq {
 
 impl Len for IpConfigReq {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() + mem::size_of::<u32>() * 3) as u16 + Cmd::len();
+        (mem::size_of::<u8>() + mem::size_of::<u32>() * 3) as u16 + Cmd::len()
     }
 }
 
@@ -244,7 +253,7 @@ pub struct IpInfoReq(Cmd);
 
 impl Len for IpInfoReq {
     fn len() -> u16 {
-        return Cmd::len();
+        Cmd::len()
     }
 }
 
@@ -256,7 +265,7 @@ pub struct RebootReq {
 }
 
 impl RebootReq {
-    fn new(timeout: u16) -> Self {
+    pub fn new(timeout: u16) -> Self {
         RebootReq {
             cmd: Cmd {
                 cmd_set: 0x00,
@@ -269,7 +278,7 @@ impl RebootReq {
 
 impl Len for RebootReq {
     fn len() -> u16 {
-        return mem::size_of::<u16>() as u16 + Cmd::len();
+        mem::size_of::<u16>() as u16 + Cmd::len()
     }
 }
 
@@ -283,21 +292,21 @@ pub struct WriteFlashReq {
 }
 
 impl Serialize for WriteFlashReq {
-    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        let mut serializer = serializer.serialize_seq(Some(17))?;
-        serializer.serialize_element(&self.cmd)?;
-        serializer.serialize_element(&0x01u16)?;
-        serializer.serialize_element(&0x01u16)?;
-        serializer.serialize_element(&self.high_sensitivity)?;
-        serializer.serialize_element(&0x02u16)?;
-        serializer.serialize_element(&0x01u16)?;
-        serializer.serialize_element(&self.repetitive_scan)?;
-        serializer.serialize_element(&0x03u16)?;
-        serializer.serialize_element(&0x01u16)?;
-        serializer.serialize_element(&self.slot_id)?;
+        let mut serializer = serializer.serialize_tuple_struct("WriteFlashReq", 17)?;
+        serializer.serialize_field(&self.cmd)?;
+        serializer.serialize_field(&0x01u16)?;
+        serializer.serialize_field(&0x01u16)?;
+        serializer.serialize_field(&self.high_sensitivity)?;
+        serializer.serialize_field(&0x02u16)?;
+        serializer.serialize_field(&0x01u16)?;
+        serializer.serialize_field(&self.repetitive_scan)?;
+        serializer.serialize_field(&0x03u16)?;
+        serializer.serialize_field(&0x01u16)?;
+        serializer.serialize_field(&self.slot_id)?;
         serializer.end()
     }
 }
@@ -321,7 +330,7 @@ impl WriteFlashReq {
 
 impl Len for WriteFlashReq {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() * 3 + mem::size_of::<u16>() * 2 * 3) as u16 + Cmd::len();
+        (mem::size_of::<u8>() * 3 + mem::size_of::<u16>() * 2 * 3) as u16 + Cmd::len()
     }
 }
 
@@ -336,23 +345,143 @@ pub struct ModeSwitchReq {
 }
 
 impl ModeSwitchReq {
-    fn new(mode: u8) -> Self {
+    pub fn new(mode: u8) -> Self {
         match mode {
-            0x01u8..=0x03u8=> ModeSwitchReq {
+            0x01u8..=0x03u8 => ModeSwitchReq {
                 cmd: Cmd {
                     cmd_set: 0x01,
                     cmd_id: 0x00,
                 },
                 mode,
             },
-            _ => panic!("Invalid mode: {}", mode),
+            _ => panic!("Invalid lidar mode: {}", mode),
         }
     }
 }
 
 impl Len for ModeSwitchReq {
     fn len() -> u16 {
-        return mem::size_of::<u8>() as u16 + Cmd::len();
+        mem::size_of::<u8>() as u16 + Cmd::len()
+    }
+}
+
+/// Write outer param
+#[derive(Debug, Serialize)]
+pub struct WriteOuterParameters {
+    cmd: Cmd,
+    roll: f32,
+    pitch: f32,
+    yaw: f32,
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+impl WriteOuterParameters {
+    pub fn new(roll: f32, pitch: f32, yaw: f32, x: i32, y: i32, z: i32) -> Self {
+        WriteOuterParameters {
+            cmd: Cmd {
+                cmd_set: 0x01,
+                cmd_id: 0x01,
+            },
+            roll,
+            pitch,
+            yaw,
+            x,
+            y,
+            z,
+        }
+    }
+}
+
+impl Len for WriteOuterParameters {
+    fn len() -> u16 {
+        (mem::size_of::<f32>() * 3 + mem::size_of::<i32>() * 3) as u16 + Cmd::len()
+    }
+}
+
+/// Get outer parameters
+#[derive(Debug, Serialize)]
+pub struct ReadOuterParameters(Cmd);
+
+impl Len for ReadOuterParameters {
+    fn len() -> u16 {
+        Cmd::len()
+    }
+}
+
+/// Set Lidar Return Mode:
+// 0x00: Single Return First
+// 0x01: Single Return Strongest
+// 0x02: Dual Return
+// 0x03: Triple Return
+#[derive(Debug, Serialize)]
+pub struct SetReturnMode {
+    cmd: Cmd,
+    mode: u8,
+}
+
+impl SetReturnMode {
+    pub fn new(mode: u8) -> Self {
+        match mode {
+            0x00u8..=0x03u8 => SetReturnMode {
+                cmd: Cmd {
+                    cmd_set: 0x01,
+                    cmd_id: 0x06,
+                },
+                mode,
+            },
+            _ => panic!("Invalid return mode: {}", mode),
+        }
+    }
+}
+
+impl Len for SetReturnMode {
+    fn len() -> u16 {
+        mem::size_of::<u8>() as u16 + Cmd::len()
+    }
+}
+
+/// Get Lidar Return Mode
+#[derive(Debug, Serialize)]
+pub struct GetReturnMode(Cmd);
+
+impl Len for GetReturnMode {
+    fn len() -> u16 {
+        Cmd::len()
+    }
+}
+
+/// Update UTC Synchronize Time
+#[derive(Debug, Serialize)]
+pub struct UpdateUtcSyncTime {
+    cmd: Cmd,
+    year: u8,
+    month: u8,
+    day: u8,
+    hour: u8,
+    microsecond: u32,
+}
+
+impl UpdateUtcSyncTime {
+    pub fn new(year: u8, month: u8, day: u8, hour: u8, microsecond: u32) -> Self {
+        UpdateUtcSyncTime {
+            cmd: Cmd {
+                cmd_set: 0x01,
+                cmd_id: 0x0A,
+            },
+            year,
+            month,
+            day,
+            hour,
+            microsecond,
+        }
+    }
+}
+
+impl Len for UpdateUtcSyncTime {
+    fn len() -> u16 {
+        (mem::size_of::<u8>() * 4 + mem::size_of::<u32>()) as u16 + Cmd::len()
     }
 }
 
