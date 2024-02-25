@@ -1,11 +1,16 @@
-use criterion::{criterion_group, criterion_main, Criterion}; 
-use lidar_rs::network_frame::control_frame::{Broadcast, ControlFrame};
-use lidar_rs::network_frame::CmdType;
-
+use criterion::{criterion_group, criterion_main, Criterion};
+use lidar_rs::network_frame::control_frame::{ControlFrame, IpConfigReq};
 
 fn control_frame_serialize_deserialize_benchmark(c: &mut Criterion) {
-    let read_from = ControlFrame::new(CmdType::Cmd, 0x11, Broadcast::new());
-    let mut write_to = ControlFrame::new(CmdType::Cmd, 0x11, Broadcast::new());
+    let read_from = ControlFrame::new(
+        0x00,
+        IpConfigReq::new(
+            0x00,
+            [192, 168, 1, 150],
+            [255, 255, 255, 0],
+            [192, 168, 1, 1],
+        ),
+    );
     let test_buffer = read_from.serialize().unwrap();
 
     c.bench_function("control_frame_serialize", |b| {
@@ -15,11 +20,11 @@ fn control_frame_serialize_deserialize_benchmark(c: &mut Criterion) {
             });
         })
     });
-    
+
     c.bench_function("control_frame_deserialize", |b| {
         b.iter(|| {
             criterion::black_box({
-                write_to.deserialize(&test_buffer).unwrap();
+                ControlFrame::<IpConfigReq>::deserialize(&test_buffer).unwrap();
             });
         })
     });
@@ -28,11 +33,10 @@ fn control_frame_serialize_deserialize_benchmark(c: &mut Criterion) {
         b.iter(|| {
             criterion::black_box({
                 let buffer = read_from.serialize().unwrap();
-                write_to.deserialize(&buffer).unwrap();
+                ControlFrame::<IpConfigReq>::deserialize(&buffer).unwrap();
             });
         })
     });
-
 }
 
 criterion_group!(benches, control_frame_serialize_deserialize_benchmark);
