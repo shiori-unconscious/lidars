@@ -156,7 +156,7 @@ pub struct HandshakeReq {
 
 impl Len for HandshakeReq {
     fn len() -> u16 {
-        (mem::size_of::<u8>() * 6 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
+        (mem::size_of::<u8>() * 4 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
     }
 }
 
@@ -181,7 +181,7 @@ impl Len for HeartbeatReq {
 }
 
 /// Start or end lidar sample, 0x00: start, 0x01: end
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SampleCtrlReq {
     cmd: Cmd,
     sample_ctrl: u8,
@@ -605,7 +605,7 @@ where
     T: Len,
 {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() * 3 + mem::size_of::<u16>()) as u16 + T::len();
+        (mem::size_of::<u8>() * 3 + mem::size_of::<u16>()) as u16 + T::len()
     }
 }
 
