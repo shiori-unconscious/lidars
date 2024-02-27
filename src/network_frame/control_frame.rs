@@ -8,7 +8,6 @@ use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 use super::cfg::*;
 
 const CRC16_INIT: u16 = 0x9232;
-// const CRC32_INIT: u32 = 0x501af26a;
 const CRC32_INIT: u32 = 0x564f580a;
 
 const LEN_OF_LENGTH_FIELD: u16 = 2;
@@ -39,7 +38,7 @@ pub const HEARTBEAT_REQ: HeartbeatReq = HeartbeatReq(Cmd {
     cmd_id: 0x03,
 });
 
-/// Start lidar sample
+/// Start lidar sampling
 pub const SAMPLE_START_REQ: SampleCtrlReq = SampleCtrlReq {
     cmd: Cmd {
         cmd_set: 0x00,
@@ -48,7 +47,7 @@ pub const SAMPLE_START_REQ: SampleCtrlReq = SampleCtrlReq {
     sample_ctrl: 0x00,
 };
 
-/// End lidar sample
+/// End lidar sampling
 pub const SAMPLE_END_REQ: SampleCtrlReq = SampleCtrlReq {
     cmd: Cmd {
         cmd_set: 0x00,
@@ -137,7 +136,7 @@ impl Len for Cmd {
 }
 
 /// Broadcast frame, received from lidar
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Broadcast {
     cmd: Cmd,
     broadcast_code: [u8; 16],
@@ -157,7 +156,7 @@ pub struct HandshakeReq {
 
 impl Len for HandshakeReq {
     fn len() -> u16 {
-        (mem::size_of::<u8>() * 4 + mem::size_of::<u16>() * 2) as u16 + Cmd::len()
+        (mem::size_of::<u8>() * 4 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
     }
 }
 
@@ -182,7 +181,7 @@ impl Len for HeartbeatReq {
 }
 
 /// Start or end lidar sample, 0x00: start, 0x01: end
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SampleCtrlReq {
     cmd: Cmd,
     sample_ctrl: u8,
@@ -218,17 +217,17 @@ impl Len for DisconnectReq {
 }
 
 /// Configure ip address, net mask and gateway address
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IpConfigReq {
     cmd: Cmd,
     ip_mode: u8,
-    ip_addr: u32,
-    net_mask: u32,
-    gw_addr: u32,
+    ip_addr: [u8; 4],
+    net_mask: [u8; 4],
+    gw_addr: [u8; 4],
 }
 
 impl IpConfigReq {
-    pub fn new(ip_mode: u8, ip_addr: u32, net_mask: u32, gw_addr: u32) -> Self {
+    pub fn new(ip_mode: u8, ip_addr: [u8; 4], net_mask: [u8; 4], gw_addr: [u8; 4]) -> Self {
         IpConfigReq {
             cmd: Cmd {
                 cmd_set: 0x00,
@@ -338,7 +337,7 @@ impl Len for WriteFlashReq {
 /// Set Lidar mode
 /// 0x01: Normal mode
 /// 0x02: Low power mode
-/// 0x03：Standby mode
+/// 0x03: Standby mode
 #[derive(Debug, Serialize)]
 pub struct ModeSwitchReq {
     cmd: Cmd,
@@ -412,10 +411,10 @@ impl Len for ReadOuterParameters {
 }
 
 /// Set Lidar Return Mode:
-// 0x00: Single Return First
-// 0x01: Single Return Strongest
-// 0x02: Dual Return
-// 0x03: Triple Return
+/// 0x00: Single Return First
+/// 0x01: Single Return Strongest
+/// 0x02: Dual Return
+/// 0x03: Triple Return
 #[derive(Debug, Serialize)]
 pub struct SetReturnMode {
     cmd: Cmd,
@@ -489,12 +488,12 @@ impl Len for UpdateUtcSyncTime {
 #[derive(Debug)]
 pub struct ControlFrame<T> {
     seq_num: u16,
-    data: T,
+    frame_seg: T,
 }
 
 impl<T> ControlFrame<T> {
-    pub fn new(seq_num: u16, data: T) -> Self {
-        ControlFrame { seq_num, data }
+    pub fn new(seq_num: u16, frame_seg: T) -> Self {
+        ControlFrame { seq_num, frame_seg }
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>>
@@ -530,7 +529,7 @@ impl<T> ControlFrame<T> {
         buf.extend(digest16.finalize().to_le_bytes());
 
         // serialize data segment
-        serialize_into(&mut buf, &self.data)?;
+        serialize_into(&mut buf, &self.frame_seg)?;
 
         // calculate CRC32
         digest32.update(&buf);
@@ -540,6 +539,7 @@ impl<T> ControlFrame<T> {
         Ok(buf)
     }
 
+    /// deserialize from buffer, return tuple of sequence number and inner frame
     pub fn deserialize<'a>(buffer: &'a [u8]) -> Result<(u16, T)>
     where
         T: Deserialize<'a>,
@@ -591,10 +591,12 @@ impl<T> ControlFrame<T> {
                 checksum_cal
             ));
         }
+
         let seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
+
         deserialize(&buffer[9..len - 4])
             .map_err(|e| anyhow!("Failed to deserialize data segment: {}", e))
-            .map(|frame| (seq_num, frame))
+            .map(|frame_seg| (seq_num, frame_seg))
     }
 }
 
@@ -603,7 +605,7 @@ where
     T: Len,
 {
     fn len() -> u16 {
-        return (mem::size_of::<u8>() * 3 + mem::size_of::<u16>()) as u16 + T::len();
+        (mem::size_of::<u8>() * 3 + mem::size_of::<u16>()) as u16 + T::len()
     }
 }
 
