@@ -8,7 +8,8 @@ use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 use super::cfg::*;
 
 const CRC16_INIT: u16 = 0x9232;
-const CRC32_INIT: u32 = 0x501af26a;
+// const CRC32_INIT: u32 = 0x501af26a;
+const CRC32_INIT: u32 = 0x564f580a;
 
 const LEN_OF_LENGTH_FIELD: u16 = 2;
 const LEN_OF_CRC16_FIELD: u16 = 2;
@@ -23,7 +24,7 @@ pub const HANDSHAKE_REQ: HandshakeReq = HandshakeReq {
     user_ip: &USER_IP,
     data_port: &DATA_PORT,
     cmd_port: &CMD_PORT,
-    imu_port: &IMU_PORT,
+    // imu_port: &IMU_PORT,
 };
 
 /// Request device information
@@ -148,15 +149,15 @@ pub struct Broadcast {
 #[derive(Debug, Serialize)]
 pub struct HandshakeReq {
     cmd: Cmd,
-    user_ip: &'static u32,
+    user_ip: &'static [u8; 4],
     data_port: &'static u16,
     cmd_port: &'static u16,
-    imu_port: &'static u16,
+    // imu_port: &'static u16,
 }
 
 impl Len for HandshakeReq {
     fn len() -> u16 {
-        (mem::size_of::<u8>() * 6 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
+        (mem::size_of::<u8>() * 4 + mem::size_of::<u16>() * 2) as u16 + Cmd::len()
     }
 }
 
@@ -539,7 +540,7 @@ impl<T> ControlFrame<T> {
         Ok(buf)
     }
 
-    pub fn deserialize<'a>(&mut self, buffer: &'a [u8]) -> Result<T>
+    pub fn deserialize<'a>(buffer: &'a [u8]) -> Result<(u16, T)>
     where
         T: Deserialize<'a>,
     {
@@ -590,11 +591,10 @@ impl<T> ControlFrame<T> {
                 checksum_cal
             ));
         }
-
-        self.seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
-
+        let seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
         deserialize(&buffer[9..len - 4])
             .map_err(|e| anyhow!("Failed to deserialize data segment: {}", e))
+            .map(|frame| (seq_num, frame))
     }
 }
 
