@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use lidar_rs::network_frame::control_frame::{ControlFrame, SampleCtrlReq, SAMPLE_START_REQ};
+use livox_lidar_rs::network_frame::control_frame::{ControlFrame, SampleCtrlReq, SAMPLE_START_REQ};
 
 fn control_frame_serialize_deserialize_benchmark(c: &mut Criterion) {
     // let read_from = ControlFrame::new(

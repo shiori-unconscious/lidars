@@ -1,5 +1,5 @@
 [package]
-name = "lidar-rs"
+name = "livox-lidar-rs"
 version = "0.1.0"
 edition = "2021"
 

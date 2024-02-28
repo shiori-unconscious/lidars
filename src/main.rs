@@ -1,4 +1,4 @@
-use lidar_rs::network_frame::control_frame::{ControlFrame, HANDSHAKE_REQ};
+use livox_lidar_rs::network_frame::control_frame::{ControlFrame, HANDSHAKE_REQ};
 use std::net::UdpSocket;
 
 fn main() -> anyhow::Result<()> {
