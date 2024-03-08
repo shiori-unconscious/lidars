@@ -23,7 +23,7 @@ pub const HANDSHAKE_REQ: HandshakeReq = HandshakeReq {
     user_ip: &USER_IP,
     data_port: &DATA_PORT,
     cmd_port: &CMD_PORT,
-    imu_port: &IMU_PORT,
+    // imu_port: &IMU_PORT,
 };
 
 /// Request device information
@@ -151,7 +151,7 @@ pub struct HandshakeReq {
     user_ip: &'static [u8; 4],
     data_port: &'static u16,
     cmd_port: &'static u16,
-    imu_port: &'static u16,
+    // imu_port: &'static u16,
 }
 
 impl Len for HandshakeReq {
