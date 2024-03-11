@@ -1,3 +1,4 @@
+workspace = { members = ["livox_lidar_derive"] }
 [package]
 name = "livox_lidar_rs"
 version = "0.1.0"
@@ -16,6 +17,7 @@ crossterm = "0.27.0"
 ratatui = "0.26.0"
 log = "0.4.21"
 env_logger = "0.11.3"
+livox_lidar_derive = { path = "./livox_lidar_derive" }
 
 [dev-dependencies]
 criterion = "0.5.1"

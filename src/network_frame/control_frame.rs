@@ -160,6 +160,12 @@ impl Len for HandshakeReq {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct HandshakeResp {
+    cmd: Cmd,
+    ret_code: u8,
+}
+
 /// Request device information
 #[derive(Debug, Serialize)]
 pub struct DeviceInfoReq(Cmd);
