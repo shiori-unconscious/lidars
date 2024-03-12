@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{self, DeriveInput};
+use syn::{self, Data, DeriveInput};
 
 #[proc_macro_derive(CheckStatus)]
 pub fn check_status_derive(input: TokenStream) -> TokenStream {
@@ -22,11 +22,16 @@ pub fn check_status_derive(input: TokenStream) -> TokenStream {
 pub fn len_derive(input: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(input).unwrap();
     let id = &ast.ident;
-    let mut i = 0;
+    let Data::Struct(ds) = ast.data else {
+        panic!("Len Derive Must be Use on struct");
+    };
     let gen = quote! {
         impl Len for #id {
             fn len() -> u16 {
-                // for f in
+                for f in ds.fields {
+
+                }
+                std::mem::size_of<>()
             }
         }
     };
