@@ -2,18 +2,13 @@ use anyhow::{anyhow, Result};
 use bincode::{deserialize, serialize_into};
 use crc::{Crc, CRC_16_MCRF4XX};
 use livox_lidar_derive::Len;
-use std::mem;
-
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
+use std::mem;
 
 use super::cfg::{CMD_PORT, DATA_PORT, IMU_PORT, USER_IP};
 
 const CRC16_INIT: u16 = 0x9232;
 const CRC32_INIT: u32 = 0x564f580a;
-
-const LEN_OF_LENGTH_FIELD: u16 = 2;
-const LEN_OF_CRC16_FIELD: u16 = 2;
-const LEN_OF_CRC32_FIELD: u16 = 4;
 
 /// Handshake to connect lidar
 pub const HANDSHAKE_REQ: HandshakeReq = HandshakeReq {
@@ -416,8 +411,7 @@ impl<T> ControlFrame<T> {
 
         let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
 
-        let buffer_len =
-            Self::len() + LEN_OF_LENGTH_FIELD + LEN_OF_CRC16_FIELD + LEN_OF_CRC32_FIELD;
+        let buffer_len = Self::len();
 
         let mut buf = Vec::with_capacity(buffer_len as usize);
 
@@ -516,7 +510,16 @@ where
     T: Len,
 {
     fn len() -> u16 {
-        (mem::size_of::<u8>() * 3 + mem::size_of::<u16>()) as u16 + T::len()
+        const SOF_LEN: usize = mem::size_of::<u8>();
+        const VERSION_LEN: usize = mem::size_of::<u8>();
+        const LENGTH_LEN: usize = mem::size_of::<u16>();
+        const CMD_TYPE_LEN: usize = mem::size_of::<u8>();
+        const SEQ_NUM_LEN: usize = mem::size_of::<u16>();
+        const CRC16_LEN: usize = mem::size_of::<u16>();
+        const CRC32_LEN: usize = mem::size_of::<u32>();
+        (SOF_LEN + VERSION_LEN + LENGTH_LEN + CMD_TYPE_LEN + SEQ_NUM_LEN + CRC16_LEN + CRC32_LEN)
+            as u16
+            + T::len()
     }
 }
 
