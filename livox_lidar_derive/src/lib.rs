@@ -1,6 +1,7 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use syn::{self, Data, DeriveInput};
 
@@ -35,13 +36,16 @@ pub fn len_derive(input: TokenStream) -> TokenStream {
     let Data::Struct(ds) = ast.data else {
         panic!("Trait Len derive must be use on struct");
     };
-    let len = ds.fields.iter().fold(0u16, |accumulate,f|{
-        accumulate + std::mem::size_of::<{ f.ty }>() as u16
-    });
+    let size_sum = TokenStream2::from_iter(ds.fields.iter().map(|f| {
+        let ty = &f.ty;
+        quote! {
+            std::mem::size_of::<#ty>(),
+        }
+    }));
     let gen = quote! {
         impl Len for #id {
             fn len() -> u16 {
-                #len
+                [#size_sum].iter().fold(0,|s,x|x+s) as u16
             }
         }
     };

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use bincode::{deserialize, serialize_into};
 use crc::{Crc, CRC_16_MCRF4XX};
 use std::mem;
+use livox_lidar_derive::Len;
 
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 
@@ -136,7 +137,7 @@ impl Len for Cmd {
 }
 
 /// Broadcast frame, received from lidar
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Len)]
 pub struct Broadcast {
     cmd: Cmd,
     broadcast_code: [u8; 16],
@@ -247,11 +248,11 @@ impl IpConfigReq {
     }
 }
 
-impl Len for IpConfigReq {
-    fn len() -> u16 {
-        (mem::size_of::<u8>() + mem::size_of::<u32>() * 3) as u16 + Cmd::len()
-    }
-}
+// impl Len for IpConfigReq {
+//     fn len() -> u16 {
+//         (mem::size_of::<u8>() + mem::size_of::<u32>() * 3) as u16 + Cmd::len()
+//     }
+// }
 
 /// Get ip info of device
 #[derive(Debug, Serialize)]
