@@ -1,12 +1,12 @@
 use anyhow::{anyhow, Result};
 use bincode::{deserialize, serialize_into};
 use crc::{Crc, CRC_16_MCRF4XX};
-use std::mem;
 use livox_lidar_derive::Len;
+use std::mem;
 
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 
-use super::cfg::*;
+use super::cfg::{CMD_PORT, DATA_PORT, IMU_PORT, USER_IP};
 
 const CRC16_INIT: u16 = 0x9232;
 const CRC32_INIT: u32 = 0x564f580a;
@@ -21,10 +21,10 @@ pub const HANDSHAKE_REQ: HandshakeReq = HandshakeReq {
         cmd_set: 0x00,
         cmd_id: 0x01,
     },
-    user_ip: &USER_IP,
-    data_port: &DATA_PORT,
-    cmd_port: &CMD_PORT,
-    // imu_port: &IMU_PORT,
+    user_ip: USER_IP,
+    data_port: DATA_PORT,
+    cmd_port: CMD_PORT,
+    imu_port: IMU_PORT,
 };
 
 /// Request device information
@@ -124,16 +124,10 @@ pub trait Len {
 }
 
 /// Command set and command id.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Len)]
 pub struct Cmd {
     cmd_set: u8,
     cmd_id: u8,
-}
-
-impl Len for Cmd {
-    fn len() -> u16 {
-        (mem::size_of::<u8>() * 2) as u16
-    }
 }
 
 /// Broadcast frame, received from lidar
@@ -146,19 +140,13 @@ pub struct Broadcast {
 }
 
 /// Handshake to connect lidar, ip address and ports is constantly configured in cfg.rs
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct HandshakeReq {
     cmd: Cmd,
-    user_ip: &'static [u8; 4],
-    data_port: &'static u16,
-    cmd_port: &'static u16,
-    // imu_port: &'static u16,
-}
-
-impl Len for HandshakeReq {
-    fn len() -> u16 {
-        (mem::size_of::<u8>() * 4 + mem::size_of::<u16>() * 3) as u16 + Cmd::len()
-    }
+    user_ip: [u8; 4],
+    data_port: u16,
+    cmd_port: u16,
+    imu_port: u16,
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,63 +156,33 @@ pub struct HandshakeResp {
 }
 
 /// Request device information
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct DeviceInfoReq(Cmd);
 
-impl Len for DeviceInfoReq {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
-
 /// Send Heartbeat frame to lidar
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct HeartbeatReq(Cmd);
 
-impl Len for HeartbeatReq {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
-
 /// Start or end lidar sample, 0x00: start, 0x01: end
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Len)]
 pub struct SampleCtrlReq {
     cmd: Cmd,
     sample_ctrl: u8,
 }
 
-impl Len for SampleCtrlReq {
-    fn len() -> u16 {
-        mem::size_of::<u8>() as u16 + Cmd::len()
-    }
-}
-
 /// Change point cloud coordinate type, 0x00: Cartesian, 0x01: Spherical
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct ChangeCoordinateReq {
     cmd: Cmd,
     coordinate_type: u8,
 }
 
-impl Len for ChangeCoordinateReq {
-    fn len() -> u16 {
-        mem::size_of::<u8>() as u16 + Cmd::len()
-    }
-}
-
 /// Disconnect from lidar
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct DisconnectReq(Cmd);
 
-impl Len for DisconnectReq {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
-
 /// Configure ip address, net mask and gateway address
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Len)]
 pub struct IpConfigReq {
     cmd: Cmd,
     ip_mode: u8,
@@ -248,24 +206,12 @@ impl IpConfigReq {
     }
 }
 
-// impl Len for IpConfigReq {
-//     fn len() -> u16 {
-//         (mem::size_of::<u8>() + mem::size_of::<u32>() * 3) as u16 + Cmd::len()
-//     }
-// }
-
 /// Get ip info of device
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct IpInfoReq(Cmd);
 
-impl Len for IpInfoReq {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
-
 /// Reboot device
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct RebootReq {
     cmd: Cmd,
     timeout: u16,
@@ -280,12 +226,6 @@ impl RebootReq {
             },
             timeout,
         }
-    }
-}
-
-impl Len for RebootReq {
-    fn len() -> u16 {
-        mem::size_of::<u16>() as u16 + Cmd::len()
     }
 }
 
@@ -345,7 +285,7 @@ impl Len for WriteFlashReq {
 /// 0x01: Normal mode
 /// 0x02: Low power mode
 /// 0x03: Standby mode
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct ModeSwitchReq {
     cmd: Cmd,
     mode: u8,
@@ -366,14 +306,8 @@ impl ModeSwitchReq {
     }
 }
 
-impl Len for ModeSwitchReq {
-    fn len() -> u16 {
-        mem::size_of::<u8>() as u16 + Cmd::len()
-    }
-}
-
 /// Write outer param
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct WriteOuterParameters {
     cmd: Cmd,
     roll: f32,
@@ -401,28 +335,16 @@ impl WriteOuterParameters {
     }
 }
 
-impl Len for WriteOuterParameters {
-    fn len() -> u16 {
-        (mem::size_of::<f32>() * 3 + mem::size_of::<i32>() * 3) as u16 + Cmd::len()
-    }
-}
-
 /// Get outer parameters
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct ReadOuterParameters(Cmd);
-
-impl Len for ReadOuterParameters {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
 
 /// Set Lidar Return Mode:
 /// 0x00: Single Return First
 /// 0x01: Single Return Strongest
 /// 0x02: Dual Return
 /// 0x03: Triple Return
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct SetReturnMode {
     cmd: Cmd,
     mode: u8,
@@ -443,24 +365,12 @@ impl SetReturnMode {
     }
 }
 
-impl Len for SetReturnMode {
-    fn len() -> u16 {
-        mem::size_of::<u8>() as u16 + Cmd::len()
-    }
-}
-
 /// Get Lidar Return Mode
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct GetReturnMode(Cmd);
 
-impl Len for GetReturnMode {
-    fn len() -> u16 {
-        Cmd::len()
-    }
-}
-
 /// Update UTC Synchronize Time
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Len)]
 pub struct UpdateUtcSyncTime {
     cmd: Cmd,
     year: u8,
@@ -483,12 +393,6 @@ impl UpdateUtcSyncTime {
             hour,
             microsecond,
         }
-    }
-}
-
-impl Len for UpdateUtcSyncTime {
-    fn len() -> u16 {
-        (mem::size_of::<u8>() * 4 + mem::size_of::<u32>()) as u16 + Cmd::len()
     }
 }
 

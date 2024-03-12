@@ -1,6 +1,9 @@
+use anyhow::Ok;
 use crossterm::event::{read, KeyCode, KeyEvent, KeyModifiers};
 use livox_lidar_rs::network_frame::cfg::{CMD_PORT, DATA_PORT, USER_IP};
-use livox_lidar_rs::network_frame::control_frame::{ControlFrame, HandshakeResp, HANDSHAKE_REQ};
+use livox_lidar_rs::network_frame::control_frame::{
+    self, ControlFrame, HandshakeResp, Len, HANDSHAKE_REQ,
+};
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::mpsc;
 use std::thread;
@@ -38,6 +41,7 @@ fn launch_control_thread() -> anyhow::Result<ThreadManager> {
         sig_term_sender: tx,
     })
 }
+
 fn main() -> anyhow::Result<()> {
     let control_thread = launch_control_thread()?;
     let data_socket = UdpSocket::bind(SocketAddr::from((USER_IP, DATA_PORT)))?;
