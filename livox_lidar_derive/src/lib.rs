@@ -12,7 +12,7 @@ pub fn check_status_derive(input: TokenStream) -> TokenStream {
     let Data::Struct(ds) = ast.data else {
         panic!("Trait CheckStatus derive must be use on struct");
     };
-    if ds
+    if !ds
         .fields
         .iter()
         .any(|f| f.ident.as_ref().is_some_and(|name| name == "ret_code"))

@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use bincode::{deserialize, serialize_into};
 use crc::{Crc, CRC_16_MCRF4XX};
-use livox_lidar_derive::Len;
+use livox_lidar_derive::{CheckStatus, Len};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 use std::mem;
 
@@ -118,6 +118,10 @@ pub trait Len {
     fn len() -> u16;
 }
 
+pub trait CheckStatus {
+    fn check_status(&self) -> bool;
+}
+
 /// Command set and command id.
 #[derive(Debug, Serialize, Deserialize, Len)]
 pub struct Cmd {
@@ -144,7 +148,7 @@ pub struct HandshakeReq {
     imu_port: u16,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, CheckStatus)]
 pub struct HandshakeResp {
     cmd: Cmd,
     ret_code: u8,
