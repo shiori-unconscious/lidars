@@ -21,8 +21,13 @@ pub fn check_status_derive(input: TokenStream) -> TokenStream {
     }
     let gen = quote! {
         impl CheckStatus for #name {
-            fn check_status(&self) -> bool {
-                self.ret_code == 0u8
+            fn check_status(&self) -> Result<()> {
+                if self.ret_code == 0u8 {
+                    Ok(())
+                }
+                else {
+                    Err(anyhow!("{} failed ❌, failure status code", stringify!(#name)))
+                }
             }
         }
     };
