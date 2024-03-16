@@ -2,9 +2,8 @@ mod frames;
 mod traits;
 
 use anyhow::{anyhow, Result};
-use bincode::{deserialize, serialize_into};
 use crc::{Crc, CRC_16_MCRF4XX};
-use livox_lidar_derive::{CheckStatus, Len};
+use livox_lidar_derive::{CheckStatus, Len, GetCmd};
 use serde::{ser::SerializeTupleStruct, Deserialize, Serialize};
 
 use std::mem;

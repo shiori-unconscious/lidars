@@ -13,8 +13,6 @@ bincode = "1.3.3"
 serde = { version = "1.0.195", features = ["derive"] }
 crc32fast = "1.3.2"
 anyhow = "1.0.79"
-crossterm = "0.27.0"
-ratatui = "0.26.0"
 log = "0.4.21"
 env_logger = "0.11.3"
 livox_lidar_derive = { path = "./livox_lidar_derive" }

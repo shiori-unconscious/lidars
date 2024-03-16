@@ -1,3 +1,4 @@
+use super::Cmd;
 /// Constantly offer length of data fragment for serialization constant
 pub trait Len {
     fn len() -> u16;
@@ -7,4 +8,8 @@ pub trait Len {
 pub trait CheckStatus {
     /// Check response status, true for success
     fn check_status(&self) -> anyhow::Result<()>;
+}
+
+pub trait GetCmd {
+    fn cmd(&self) -> Cmd;
 }

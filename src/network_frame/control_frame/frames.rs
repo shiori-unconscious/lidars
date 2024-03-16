@@ -1,14 +1,14 @@
 use super::*;
 
 /// Command set and command id.
-#[derive(Debug, Serialize, Deserialize, Len)]
+#[derive(Debug, Serialize, Deserialize, Len, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct Cmd {
     cmd_set: u8,
     cmd_id: u8,
 }
 
 /// Broadcast frame, received from lidar
-#[derive(Debug, Serialize, Deserialize, Len)]
+#[derive(Debug, Serialize, Deserialize, Len, GetCmd)]
 pub struct Broadcast {
     cmd: Cmd,
     broadcast_code: [u8; 16],
@@ -17,7 +17,7 @@ pub struct Broadcast {
 }
 
 /// Handshake to connect lidar, ip address and ports is constantly configured in cfg.rs
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct HandshakeReq {
     cmd: Cmd,
     user_ip: [u8; 4],
@@ -40,12 +40,11 @@ pub const HANDSHAKE_REQ: HandshakeReq = HandshakeReq {
 
 #[derive(Debug, Deserialize, CheckStatus)]
 pub struct CommonResp {
-    cmd: Cmd,
     ret_code: u8,
 }
 
 /// Request device information
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct DeviceInfoReq(Cmd);
 
 /// Request device information
@@ -56,13 +55,12 @@ pub const DEVICE_INFO_REQ: DeviceInfoReq = DeviceInfoReq(Cmd {
 
 #[derive(Debug, Deserialize, CheckStatus)]
 pub struct DeviceInfoResp {
-    cmd: Cmd,
     ret_code: u8,
     version: [u8; 4],
 }
 
 /// Send Heartbeat frame to lidar
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct HeartbeatReq(Cmd);
 
 /// Send Heartbeat frame to lidar
@@ -73,7 +71,6 @@ pub const HEARTBEAT_REQ: HeartbeatReq = HeartbeatReq(Cmd {
 
 #[derive(Debug, Deserialize, CheckStatus)]
 pub struct HeartbeatResp {
-    cmd: Cmd,
     ret_code: u8,
     work_state: u8,
     feature_msg: u8,
@@ -81,7 +78,7 @@ pub struct HeartbeatResp {
 }
 
 /// Start or end lidar sample, 0x00: start, 0x01: end
-#[derive(Debug, Serialize, Deserialize, Len)]
+#[derive(Debug, Serialize, Deserialize, Len, GetCmd)]
 pub struct SampleCtrlReq {
     cmd: Cmd,
     sample_ctrl: u8,
@@ -93,7 +90,7 @@ pub const SAMPLE_START_REQ: SampleCtrlReq = SampleCtrlReq {
         cmd_set: 0x00,
         cmd_id: 0x04,
     },
-    sample_ctrl: 0x00,
+    sample_ctrl: 0x01,
 };
 
 /// End lidar sampling
@@ -102,11 +99,11 @@ pub const SAMPLE_END_REQ: SampleCtrlReq = SampleCtrlReq {
         cmd_set: 0x00,
         cmd_id: 0x04,
     },
-    sample_ctrl: 0x01,
+    sample_ctrl: 0x00,
 };
 
 /// Change point cloud coordinate type, 0x00: Cartesian, 0x01: Spherical
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct ChangeCoordinateReq {
     cmd: Cmd,
     coordinate_type: u8,
@@ -131,7 +128,7 @@ pub const SPHERICAL_COORDINATE_REQ: ChangeCoordinateReq = ChangeCoordinateReq {
 };
 
 /// Disconnect from lidar
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct DisconnectReq(Cmd);
 
 /// Disconnect from lidar
@@ -141,7 +138,7 @@ pub const DISCONNECT_REQ: DisconnectReq = DisconnectReq(Cmd {
 });
 
 /// Configure ip address, net mask and gateway address
-#[derive(Debug, Serialize, Deserialize, Len)]
+#[derive(Debug, Serialize, Deserialize, Len, GetCmd)]
 pub struct IpConfigReq {
     cmd: Cmd,
     ip_mode: u8,
@@ -166,7 +163,7 @@ impl IpConfigReq {
 }
 
 /// Get ip info of device
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct IpInfoReq(Cmd);
 
 /// Get ip information of device
@@ -176,7 +173,7 @@ pub const IP_INFO_REQ: IpInfoReq = IpInfoReq(Cmd {
 });
 
 /// Reboot device
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct RebootReq {
     cmd: Cmd,
     timeout: u16,
@@ -270,7 +267,7 @@ impl Len for WriteFlashReq {
 /// 0x01: Normal mode
 /// 0x02: Low power mode
 /// 0x03: Standby mode
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct ModeSwitchReq {
     cmd: Cmd,
     mode: u8,
@@ -292,7 +289,7 @@ impl ModeSwitchReq {
 }
 
 /// Write outer param
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct WriteOuterParameters {
     cmd: Cmd,
     roll: f32,
@@ -321,7 +318,7 @@ impl WriteOuterParameters {
 }
 
 /// Get outer parameters
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct ReadOuterParameters(Cmd);
 
 /// Read outer parameters of lidar
@@ -335,7 +332,7 @@ pub const READ_OUTER_PARAMETERS: ReadOuterParameters = ReadOuterParameters(Cmd {
 /// 0x01: Single Return Strongest
 /// 0x02: Dual Return
 /// 0x03: Triple Return
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct SetReturnMode {
     cmd: Cmd,
     mode: u8,
@@ -357,7 +354,7 @@ impl SetReturnMode {
 }
 
 /// Get Lidar Return Mode
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct GetReturnMode(Cmd);
 
 pub const GET_RETURN_MODE: GetReturnMode = GetReturnMode(Cmd {
@@ -366,7 +363,7 @@ pub const GET_RETURN_MODE: GetReturnMode = GetReturnMode(Cmd {
 });
 
 /// Update UTC Synchronize Time
-#[derive(Debug, Serialize, Len)]
+#[derive(Debug, Serialize, Len, GetCmd)]
 pub struct UpdateUtcSyncTime {
     cmd: Cmd,
     year: u8,
@@ -393,13 +390,13 @@ impl UpdateUtcSyncTime {
 }
 
 #[derive(Debug)]
-pub struct ControlFrame<T> {
+pub struct ControlFrame<'a, T> {
     seq_num: u16,
-    frame_seg: T,
+    frame_seg: &'a T,
 }
 
-impl<T> ControlFrame<T> {
-    pub fn new(seq_num: u16, frame_seg: T) -> Self {
+impl<'a, T> ControlFrame<'a, T> {
+    pub fn new(seq_num: u16, frame_seg: &'a T) -> Self {
         ControlFrame { seq_num, frame_seg }
     }
 
@@ -435,7 +432,7 @@ impl<T> ControlFrame<T> {
         buf.extend(digest16.finalize().to_le_bytes());
 
         // serialize data segment
-        serialize_into(&mut buf, &self.frame_seg)?;
+        bincode::serialize_into(&mut buf, &self.frame_seg)?;
 
         // calculate CRC32
         digest32.update(&buf);
@@ -444,69 +441,9 @@ impl<T> ControlFrame<T> {
 
         Ok(buf)
     }
-
-    /// deserialize from buffer, return tuple of sequence number and inner frame
-    pub fn deserialize<'a>(buffer: &'a [u8]) -> Result<(u16, T)>
-    where
-        T: Deserialize<'a>,
-    {
-        let len = u16::from_le_bytes(buffer[2..=3].try_into()?) as usize;
-        if buffer.len() != len {
-            return Err(anyhow!(
-                concat!(
-                    "Cannot deserialize the serial due to an incompatible length:",
-                    "the length of the serial is {}, ",
-                    "while the length of the <ControlFrame> frame is {}."
-                ),
-                buffer.len(),
-                len,
-            ));
-        }
-
-        let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
-        let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
-        digest16.update(&buffer[..7]);
-        let checksum_recv = u16::from_le_bytes(buffer[7..=8].try_into()?);
-        let checksum_cal = digest16.finalize();
-        if checksum_cal != checksum_recv {
-            return Err(anyhow!(
-                concat!(
-                    "Crc16 for header of <ControlFrame> failed",
-                    "checksum received is 0x{:X?}, ",
-                    "while the calculated checksum is 0x{:X?}.",
-                ),
-                checksum_recv,
-                checksum_cal
-            ));
-        }
-
-        let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
-        digest32.update(&buffer[..len - 4]);
-
-        let checksum_recv = u32::from_le_bytes(buffer[len - 4..].try_into()?);
-        let checksum_cal = digest32.finalize();
-
-        if checksum_cal != checksum_recv {
-            return Err(anyhow!(
-                concat!(
-                    "Crc32 for frame of <ControlFrame> failed",
-                    "checksum received is {:X?}, ",
-                    "while the calculated checksum is {:X?}.",
-                ),
-                checksum_recv,
-                checksum_cal
-            ));
-        }
-
-        let seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
-
-        deserialize(&buffer[9..len - 4])
-            .map_err(|e| anyhow!("Failed to deserialize data segment: {}", e))
-            .map(|frame_seg| (seq_num, frame_seg))
-    }
 }
 
-impl<T> Len for ControlFrame<T>
+impl<T> Len for ControlFrame<'_, T>
 where
     T: Len,
 {
@@ -524,6 +461,63 @@ where
     }
 }
 
+/// deserialize from buffer, return tuple of sequence number and inner frame
+pub fn deserialize_resp<'a>(buffer: &'a [u8]) -> Result<(u16, Cmd, &'a [u8])> {
+    let len = u16::from_le_bytes(buffer[2..=3].try_into()?) as usize;
+    if buffer.len() != len {
+        return Err(anyhow!(
+            concat!(
+                "Cannot deserialize the serial due to an incompatible length:",
+                "the length of the serial is {}, ",
+                "while the length of the <ControlFrame> frame is {}."
+            ),
+            buffer.len(),
+            len,
+        ));
+    }
+
+    let crc16 = Crc::<u16>::new(&CRC_16_MCRF4XX);
+    let mut digest16 = crc16.digest_with_initial(CRC16_INIT);
+    digest16.update(&buffer[..7]);
+    let checksum_recv = u16::from_le_bytes(buffer[7..=8].try_into()?);
+    let checksum_cal = digest16.finalize();
+    if checksum_cal != checksum_recv {
+        return Err(anyhow!(
+            concat!(
+                "Crc16 for header of <ControlFrame> failed",
+                "checksum received is 0x{:X?}, ",
+                "while the calculated checksum is 0x{:X?}.",
+            ),
+            checksum_recv,
+            checksum_cal
+        ));
+    }
+
+    let mut digest32 = crc32fast::Hasher::new_with_initial(CRC32_INIT);
+    digest32.update(&buffer[..len - 4]);
+
+    let checksum_recv = u32::from_le_bytes(buffer[len - 4..].try_into()?);
+    let checksum_cal = digest32.finalize();
+
+    if checksum_cal != checksum_recv {
+        return Err(anyhow!(
+            concat!(
+                "Crc32 for frame of <ControlFrame> failed",
+                "checksum received is {:X?}, ",
+                "while the calculated checksum is {:X?}.",
+            ),
+            checksum_recv,
+            checksum_cal
+        ));
+    }
+
+    let seq_num = u16::from_le_bytes(buffer[5..=6].try_into()?);
+
+    bincode::deserialize(&buffer[9..11])
+        .map_err(|e| anyhow!("Failed to deserialize data segment: {}", e))
+        .map(|cmd| (seq_num, cmd, &buffer[11..len - 4]))
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -531,7 +525,7 @@ mod tests {
 
     #[test]
     fn test_serialize() {
-        let control_frame = ControlFrame::new(0x11, HANDSHAKE_REQ);
+        let control_frame = ControlFrame::new(0x11, &HANDSHAKE_REQ);
         let serialized = control_frame.serialize().unwrap();
 
         assert_eq!(
