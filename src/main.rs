@@ -19,7 +19,7 @@ type TransmitMap = HashMap<Cmd, mpsc::Sender<Vec<u8>>>;
 type ReceiveMap = HashMap<Cmd, mpsc::Receiver<Vec<u8>>>;
 
 fn heartbeat_daemon(
-    command_sender: Arc<CommandSender>,
+    command_sender: Arc<CommandEmitter>,
 ) -> anyhow::Result<(JoinHandle, mpsc::Sender<()>)> {
     debug!("heartbeat thread started ✅");
 
@@ -42,7 +42,7 @@ fn heartbeat_daemon(
     Ok((handle, tx))
 }
 
-struct CommandSender {
+struct CommandEmitter {
     control_socket: UdpSocket,
     seq_ref: Mutex<u16>,
     transmit_map: Arc<Mutex<TransmitMap>>,
@@ -50,7 +50,7 @@ struct CommandSender {
     term_sender: mpsc::Sender<()>,
 }
 
-impl CommandSender {
+impl CommandEmitter {
     fn new(lidar_addr: SocketAddr, control_socket: UdpSocket) -> Self {
         if let Err(e) = control_socket.connect(lidar_addr) {
             if log_enabled!(log::Level::Error) {
@@ -157,12 +157,6 @@ impl CommandSender {
     }
 }
 
-impl Drop for CommandSender {
-    fn drop(&mut self) {
-        self.term_sender.send(()).unwrap();
-    }
-}
-
 fn main() -> anyhow::Result<()> {
     Builder::from_default_env().target(Target::Stdout).init();
 
@@ -183,7 +177,7 @@ fn main() -> anyhow::Result<()> {
         debug!("received broadcast from {:?}", lidar_addr);
     }
 
-    let command_sender = Arc::new(CommandSender::new(lidar_addr, control_socket));
+    let command_sender = Arc::new(CommandEmitter::new(lidar_addr, control_socket));
 
     debug!("trying handshake...");
     let _: CommonResp = command_sender.execute_command(HANDSHAKE_REQ)?;
