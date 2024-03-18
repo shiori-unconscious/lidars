@@ -19,18 +19,20 @@ type TransmitMap = HashMap<Cmd, mpsc::Sender<Vec<u8>>>;
 type ReceiveMap = HashMap<Cmd, mpsc::Receiver<Vec<u8>>>;
 
 fn heartbeat_daemon(
-    command_sender: Arc<CommandEmitter>,
+    command_emitter: Arc<CommandEmitter>,
 ) -> anyhow::Result<(JoinHandle, mpsc::Sender<()>)> {
     debug!("heartbeat thread started ✅");
 
     let (tx, rx) = mpsc::channel();
 
     let time_to_live = Duration::from_millis(1000);
+
+    // launch heartbeat daemon, in which send heartbeat request every 1 second
     let handle: JoinHandle = thread::spawn(move || loop {
         match rx.try_recv() {
             Err(_) => {
                 debug!("heartbeat daemon: no sig_term received, continue...");
-                let _: CommonResp = command_sender.execute_command(HEARTBEAT_REQ)?;
+                let _: CommonResp = command_emitter.execute_command(HEARTBEAT_REQ)?;
                 thread::sleep(time_to_live);
             }
             Ok(_) => {
@@ -64,6 +66,7 @@ impl CommandEmitter {
         let receive_map: Arc<Mutex<ReceiveMap>> = Arc::new(Mutex::new(HashMap::new()));
         let duplicated_transmit_map = transmit_map.clone();
 
+        // start command response receiver, receiving all response in this thread, and sending to corresponding channel
         let _: JoinHandle = thread::spawn(move || {
             let mut buffer = [0; 1024];
             loop {
@@ -177,31 +180,31 @@ fn main() -> anyhow::Result<()> {
         debug!("received broadcast from {:?}", lidar_addr);
     }
 
-    let command_sender = Arc::new(CommandEmitter::new(lidar_addr, control_socket));
+    let command_emitter = Arc::new(CommandEmitter::new(lidar_addr, control_socket));
 
     debug!("trying handshake...");
-    let _: CommonResp = command_sender.execute_command(HANDSHAKE_REQ)?;
+    let _: CommonResp = command_emitter.execute_command(HANDSHAKE_REQ)?;
     debug!("handshake success ✅");
 
     info!("success connected to lidar ✅");
 
-    let (handle, term_sender) = heartbeat_daemon(command_sender.clone())?;
+    let (handle, term_sender) = heartbeat_daemon(command_emitter.clone())?;
     info!("heartbeat daemon launched ✅");
 
-    let duplicated_command_sender = command_sender.clone();
+    let duplicated_command_emitter = command_emitter.clone();
     // register SIGINT handler
     ctrlc::set_handler(move || {
         info!("received SIGINT in callback, disconnecting...");
-        duplicated_command_sender
+        duplicated_command_emitter
             .execute_command::<DisconnectReq, CommonResp>(DISCONNECT_REQ)
             .unwrap();
         info!("lidar disconnected ✅");
         term_sender.send(()).unwrap();
         info!("heartbeat daemon terminating...");
-        duplicated_command_sender.term_sender.send(()).unwrap()
+        duplicated_command_emitter.term_sender.send(()).unwrap()
     })?;
 
-    command_sender.execute_command::<SampleCtrlReq, CommonResp>(SAMPLE_START_REQ)?;
+    command_emitter.execute_command::<SampleCtrlReq, CommonResp>(SAMPLE_START_REQ)?;
     info!("success start sampling ✅");
 
     handle.join().unwrap()?;
