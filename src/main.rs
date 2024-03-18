@@ -31,7 +31,7 @@ fn heartbeat_daemon(
         match rx.try_recv() {
             Err(_) => {
                 debug!("heartbeat daemon: no sig_term received, continue...");
-                let _: CommonResp = command_emitter.execute_command(HEARTBEAT_REQ)?;
+                let _: CommonResp = command_emitter.command_execute(HEARTBEAT_REQ)?;
                 thread::sleep(time_to_live);
             }
             Ok(_) => {
@@ -115,7 +115,7 @@ impl CommandEmitter {
     }
 
     /// execute certain command and return the response
-    fn execute_command<T, P>(&self, req: T) -> anyhow::Result<P>
+    fn command_execute<T, P>(&self, req: T) -> anyhow::Result<P>
     where
         T: Len + Serialize + GetCmd,
         P: CheckStatus + for<'de> serde::Deserialize<'de>,
@@ -159,6 +159,10 @@ impl CommandEmitter {
     }
 }
 
+fn data_processing() -> anyhow::Result<()> {
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
     Builder::from_default_env().target(Target::Stdout).init();
 
@@ -182,7 +186,7 @@ fn main() -> anyhow::Result<()> {
     let command_emitter = Arc::new(CommandEmitter::new(lidar_addr, control_socket));
 
     debug!("trying handshake...");
-    let _: CommonResp = command_emitter.execute_command(HANDSHAKE_REQ)?;
+    let _: CommonResp = command_emitter.command_execute(HANDSHAKE_REQ)?;
     debug!("handshake success ✅");
 
     info!("success connected to lidar ✅");
@@ -195,7 +199,7 @@ fn main() -> anyhow::Result<()> {
     ctrlc::set_handler(move || {
         info!("received SIGINT in callback, disconnecting...");
         duplicated_command_emitter
-            .execute_command::<DisconnectReq, CommonResp>(DISCONNECT_REQ)
+            .command_execute::<DisconnectReq, CommonResp>(DISCONNECT_REQ)
             .unwrap();
         info!("lidar disconnected ✅");
         term_sender.send(()).unwrap();
@@ -203,7 +207,7 @@ fn main() -> anyhow::Result<()> {
         duplicated_command_emitter.term_sender.send(()).unwrap()
     })?;
 
-    command_emitter.execute_command::<SampleCtrlReq, CommonResp>(SAMPLE_START_REQ)?;
+    command_emitter.command_execute::<SampleCtrlReq, CommonResp>(SAMPLE_START_REQ)?;
     info!("success start sampling ✅");
 
     handle.join().unwrap()?;
