@@ -1,1 +1,1 @@
-pub mod network_frame;
+pub mod lidar_frame;

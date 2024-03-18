@@ -1,8 +1,8 @@
 use env_logger::{Builder, Target};
-use livox_lidar_rs::network_frame::cfg::{CMD_PORT, DATA_PORT, USER_IP};
-use livox_lidar_rs::network_frame::control_frame::{
-    deserialize_resp, CheckStatus, Cmd, CommonResp, ControlFrame, DisconnectReq, GetCmd, Len,
-    SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ, SAMPLE_START_REQ,
+use livox_lidar_rs::lidar_frame::cfg::{CMD_PORT, DATA_PORT, USER_IP};
+use livox_lidar_rs::lidar_frame::frames::{
+    deserialize_resp, CheckStatus, Cmd, CommonResp, ControlFrame, DataFrame, DisconnectReq, GetCmd,
+    Len, SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ, SAMPLE_START_REQ,
 };
 use log::{debug, info, log_enabled, warn};
 use serde::Serialize;
@@ -14,11 +14,11 @@ use std::time::Duration;
 
 type AnyhowHandle = thread::JoinHandle<anyhow::Result<()>>;
 
-type TransmitMap = HashMap<Cmd, mpsc::Sender<Vec<u8>>>;
-type ReceiveMap = HashMap<Cmd, mpsc::Receiver<Vec<u8>>>;
+type TransmitterMap = HashMap<Cmd, mpsc::Sender<Vec<u8>>>;
+type ReceiverMap = HashMap<Cmd, mpsc::Receiver<Vec<u8>>>;
 
-fn heartbeat_daemon(
-    command_emitter: Arc<CommandEmitter>,
+fn heartbeat_daemon_launch(
+    command_emitter: Arc<CommandProcessor>,
 ) -> anyhow::Result<(AnyhowHandle, mpsc::Sender<()>)> {
     debug!("heartbeat thread started ✅");
 
@@ -42,16 +42,46 @@ fn heartbeat_daemon(
     });
     Ok((handle, tx))
 }
+// fn point_deserialize
+fn data_receiver_launch(
+    data_socket: UdpSocket,
+    lidar_addr: SocketAddr,
+) -> anyhow::Result<(AnyhowHandle, mpsc::Sender<()>)> {
+    let (tx, rx) = mpsc::channel();
+    let handle: AnyhowHandle = thread::spawn(move || loop {
+        let mut buffer = [0; 1024];
+        match data_socket.recv(&mut buffer) {
+            Ok(size) => {
+                if log_enabled!(log::Level::Debug) {
+                    debug!("received data: {:?}", &buffer[..size]);
+                }
+                let unuse_len = DataFrame::len() as usize - std::mem::size_of::<u64>();
+                let timestamp = u64::from_le_bytes(
+                    buffer[unuse_len..DataFrame::len() as usize]
+                        .try_into()
+                        .unwrap(),
+                );
+                // &buffer[DataFrame::len() as usize..size];
+            }
+            Err(e) => {
+                if log_enabled!(log::Level::Warn) {
+                    warn!("error occurred when receiving data: {}", e);
+                }
+            }
+        }
+    });
+    Ok((handle, tx))
+}
 
-struct CommandEmitter {
+struct CommandProcessor {
     control_socket: UdpSocket,
     seq_ref: Mutex<u16>,
-    transmit_map: Arc<Mutex<TransmitMap>>,
-    receive_map: Arc<Mutex<ReceiveMap>>,
+    transmit_map: Arc<Mutex<TransmitterMap>>,
+    receive_map: Arc<Mutex<ReceiverMap>>,
     term_sender: mpsc::Sender<()>,
 }
 
-impl CommandEmitter {
+impl CommandProcessor {
     fn new(lidar_addr: SocketAddr, control_socket: UdpSocket) -> Self {
         if let Err(e) = control_socket.connect(lidar_addr) {
             if log_enabled!(log::Level::Error) {
@@ -61,8 +91,8 @@ impl CommandEmitter {
         let (tx, rx) = mpsc::channel();
         let duplicated_control_socket = control_socket.try_clone().unwrap();
 
-        let transmit_map: Arc<Mutex<TransmitMap>> = Arc::new(Mutex::new(HashMap::new()));
-        let receive_map: Arc<Mutex<ReceiveMap>> = Arc::new(Mutex::new(HashMap::new()));
+        let transmit_map: Arc<Mutex<TransmitterMap>> = Arc::new(Mutex::new(HashMap::new()));
+        let receive_map: Arc<Mutex<ReceiverMap>> = Arc::new(Mutex::new(HashMap::new()));
         let duplicated_transmit_map = transmit_map.clone();
 
         // start command response receiver, receiving all response in this thread, and sending to corresponding channel
@@ -159,10 +189,6 @@ impl CommandEmitter {
     }
 }
 
-fn data_processing() -> anyhow::Result<()> {
-    Ok(())
-}
-
 fn main() -> anyhow::Result<()> {
     Builder::from_default_env().target(Target::Stdout).init();
 
@@ -183,7 +209,7 @@ fn main() -> anyhow::Result<()> {
         debug!("received broadcast from {:?}", lidar_addr);
     }
 
-    let command_emitter = Arc::new(CommandEmitter::new(lidar_addr, control_socket));
+    let command_emitter = Arc::new(CommandProcessor::new(lidar_addr, control_socket));
 
     debug!("trying handshake...");
     let _: CommonResp = command_emitter.command_execute(HANDSHAKE_REQ)?;
@@ -191,7 +217,7 @@ fn main() -> anyhow::Result<()> {
 
     info!("success connected to lidar ✅");
 
-    let (handle, term_sender) = heartbeat_daemon(command_emitter.clone())?;
+    let (handle, term_sender) = heartbeat_daemon_launch(command_emitter.clone())?;
     info!("heartbeat daemon launched ✅");
 
     let duplicated_command_emitter = command_emitter.clone();
