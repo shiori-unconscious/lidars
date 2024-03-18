@@ -142,11 +142,11 @@ impl CommandEmitter {
         }
 
         let mes = self
-            .receive_map
-            .lock()
-            .unwrap()
-            .get(&req.cmd())
-            .unwrap()
+            .receive_map // listen to mpsc channel for response
+            .lock() // get lock
+            .unwrap() // if get lock wrong, crash immediately
+            .get(&req.cmd()) // get corresponding response channel
+            .unwrap() // must have corresponding channel already exist
             .recv()?;
         let resp: P = bincode::deserialize(&mes)?;
         resp.check_status()?;

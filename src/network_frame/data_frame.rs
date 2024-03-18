@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Debug, Serialize)]
 pub struct CartesianPoint {
     x: i32, // millimeters
@@ -12,7 +11,7 @@ pub struct CartesianPoint {
 
 #[derive(Debug, Serialize)]
 pub struct SphericalPoint {
-    depth: u32, // millimeters
+    depth: u32,  // millimeters
     zenith: u16, // 0.01 degree
     azimuth: u16,
     reflectivity: u8,
