@@ -1,9 +1,8 @@
 use env_logger::{Builder, Target};
 use livox_lidar_rs::network_frame::cfg::{CMD_PORT, DATA_PORT, USER_IP};
 use livox_lidar_rs::network_frame::control_frame::{
-    deserialize_resp, CheckStatus, Cmd, CommonResp, ControlFrame, DisconnectReq, GetCmd,
-    HandshakeReq, HeartbeatReq, Len, SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ,
-    SAMPLE_START_REQ,
+    deserialize_resp, CheckStatus, Cmd, CommonResp, ControlFrame, DisconnectReq, GetCmd, Len,
+    SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ, SAMPLE_START_REQ,
 };
 use log::{debug, info, log_enabled, warn};
 use serde::Serialize;
@@ -13,14 +12,14 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-type JoinHandle = thread::JoinHandle<anyhow::Result<()>>;
+type AnyhowHandle = thread::JoinHandle<anyhow::Result<()>>;
 
 type TransmitMap = HashMap<Cmd, mpsc::Sender<Vec<u8>>>;
 type ReceiveMap = HashMap<Cmd, mpsc::Receiver<Vec<u8>>>;
 
 fn heartbeat_daemon(
     command_emitter: Arc<CommandEmitter>,
-) -> anyhow::Result<(JoinHandle, mpsc::Sender<()>)> {
+) -> anyhow::Result<(AnyhowHandle, mpsc::Sender<()>)> {
     debug!("heartbeat thread started ✅");
 
     let (tx, rx) = mpsc::channel();
@@ -28,7 +27,7 @@ fn heartbeat_daemon(
     let time_to_live = Duration::from_millis(1000);
 
     // launch heartbeat daemon, in which send heartbeat request every 1 second
-    let handle: JoinHandle = thread::spawn(move || loop {
+    let handle: AnyhowHandle = thread::spawn(move || loop {
         match rx.try_recv() {
             Err(_) => {
                 debug!("heartbeat daemon: no sig_term received, continue...");
@@ -67,7 +66,7 @@ impl CommandEmitter {
         let duplicated_transmit_map = transmit_map.clone();
 
         // start command response receiver, receiving all response in this thread, and sending to corresponding channel
-        let _: JoinHandle = thread::spawn(move || {
+        let _: AnyhowHandle = thread::spawn(move || {
             let mut buffer = [0; 1024];
             loop {
                 if let Ok(_) = rx.try_recv() {
