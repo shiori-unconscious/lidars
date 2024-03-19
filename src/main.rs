@@ -2,7 +2,8 @@ use env_logger::{Builder, Target};
 use livox_lidar_rs::lidar_frame::cfg::{CMD_PORT, DATA_PORT, USER_IP};
 use livox_lidar_rs::lidar_frame::frames::{
     deserialize_resp, CheckStatus, Cmd, CommonResp, ControlFrame, DataFrame, DisconnectReq, GetCmd,
-    Len, SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ, SAMPLE_START_REQ,
+    Len, SampleCtrlReq, DISCONNECT_REQ, HANDSHAKE_REQ, HEARTBEAT_REQ, SAMPLE_END_REQ,
+    SAMPLE_START_REQ,
 };
 use log::{debug, info, log_enabled, warn};
 use serde::Serialize;
@@ -28,40 +29,48 @@ fn heartbeat_daemon_launch(
 
     // launch heartbeat daemon, in which send heartbeat request every 1 second
     let handle: AnyhowHandle = thread::spawn(move || loop {
-        match rx.try_recv() {
-            Err(_) => {
-                debug!("heartbeat daemon: no sig_term received, continue...");
-                let _: CommonResp = command_emitter.command_execute(HEARTBEAT_REQ)?;
-                thread::sleep(time_to_live);
-            }
-            Ok(_) => {
-                info!("received sig_term, heartbeat daemon exiting...");
-                return Ok(());
-            }
+        if let Ok(_) = rx.try_recv() {
+            info!("received sig_term, heartbeat daemon exiting...");
+            return Ok(());
         }
+        debug!("heartbeat daemon: no sig_term received, continue...");
+        let _: CommonResp = command_emitter.command_execute(HEARTBEAT_REQ)?;
+        thread::sleep(time_to_live);
     });
     Ok((handle, tx))
 }
+
 // fn point_deserialize
 fn data_receiver_launch(
     data_socket: UdpSocket,
-    lidar_addr: SocketAddr,
 ) -> anyhow::Result<(AnyhowHandle, mpsc::Sender<()>)> {
+    let mut buffer = [0; 1024];
+
     let (tx, rx) = mpsc::channel();
+
+    let local_socket = UdpSocket::bind(SocketAddr::from(([127, 0, 0, 1], 54321)))?;
+    local_socket.connect(SocketAddr::from(([127, 0, 0, 1], 47384)))?;
+
     let handle: AnyhowHandle = thread::spawn(move || loop {
-        let mut buffer = [0; 1024];
-        match data_socket.recv(&mut buffer) {
-            Ok(size) => {
-                if log_enabled!(log::Level::Debug) {
-                    debug!("received data: {:?}", &buffer[..size]);
-                }
-                let unuse_len = DataFrame::len() as usize - std::mem::size_of::<u64>();
-                let timestamp = u64::from_le_bytes(
-                    buffer[unuse_len..DataFrame::len() as usize]
-                        .try_into()
-                        .unwrap(),
-                );
+        if let Ok(_) = rx.try_recv() {
+            info!("received sig_term, data receiver exiting...");
+            return Ok(());
+        }
+        debug!("data receiver: no sig_term received, continue...");
+        match data_socket.recv_from(&mut buffer) {
+            Ok((size, _)) => {
+                let unused_len = DataFrame::len() as usize - std::mem::size_of::<u64>();
+                // let timestamp = u64::from_le_bytes(
+                //     buffer[unused_len..DataFrame::len() as usize]
+                //         .try_into()
+                //         .unwrap(),
+                // );
                 // &buffer[DataFrame::len() as usize..size];
+                if let Err(e) = local_socket.send(&buffer[unused_len..size]) {
+                    if log_enabled!(log::Level::Warn) {
+                        warn!("error occurred when sending data to local socket: {}", e);
+                    }
+                }
             }
             Err(e) => {
                 if log_enabled!(log::Level::Warn) {
@@ -100,9 +109,7 @@ impl CommandProcessor {
             let mut buffer = [0; 1024];
             loop {
                 if let Ok(_) = rx.try_recv() {
-                    if log_enabled!(log::Level::Info) {
-                        info!("received sig_term, command response receiver exiting...");
-                    }
+                    info!("received sig_term, command response receiver exiting...");
                     return Ok(());
                 }
                 debug!("command response receiver: no sig_term received, continue...");
@@ -110,7 +117,7 @@ impl CommandProcessor {
                     Ok(size) => match deserialize_resp(&buffer[..size]) {
                         Ok((_, cmd, frame)) => {
                             if log_enabled!(log::Level::Debug) {
-                                debug!("received response: {:?}", cmd);
+                                debug!("command response on: {:?}", cmd);
                             }
 
                             transmit_map
@@ -220,17 +227,50 @@ fn main() -> anyhow::Result<()> {
     let (handle, term_sender) = heartbeat_daemon_launch(command_emitter.clone())?;
     info!("heartbeat daemon launched ✅");
 
+    let (_, term_sender2) = data_receiver_launch(data_socket)?;
+    info!("data receiver launched ✅");
+
     let duplicated_command_emitter = command_emitter.clone();
+
     // register SIGINT handler
     ctrlc::set_handler(move || {
         info!("received SIGINT in callback, disconnecting...");
-        duplicated_command_emitter
+        match duplicated_command_emitter
+            .command_execute::<SampleCtrlReq, CommonResp>(SAMPLE_END_REQ)
+        {
+            Ok(_) => info!("success end sampling ✅"),
+            Err(e) => warn!("error occurred when ending sampling: {}", e),
+        }
+
+        match duplicated_command_emitter
             .command_execute::<DisconnectReq, CommonResp>(DISCONNECT_REQ)
-            .unwrap();
+        {
+            Ok(_) => info!("success disconnect ✅"),
+            Err(e) => warn!("error occurred when disconnecting: {}", e),
+        }
+
         info!("lidar disconnected ✅");
-        term_sender.send(()).unwrap();
-        info!("heartbeat daemon terminating...");
-        duplicated_command_emitter.term_sender.send(()).unwrap()
+        match term_sender2.send(()) {
+            Ok(_) => info!("sigint sent, data receiver terminating..."),
+            Err(e) => warn!(
+                "error occurred when sending sig_term to data receiver: {}",
+                e
+            ),
+        }
+        match term_sender.send(()) {
+            Ok(_) => info!("sigint sent, heartbeat daemon terminating..."),
+            Err(e) => warn!(
+                "error occurred when sending sig_term to heartbeat daemon: {}",
+                e
+            ),
+        }
+        match duplicated_command_emitter.term_sender.send(()) {
+            Ok(_) => info!("sigint sent, command processor terminating..."),
+            Err(e) => warn!(
+                "error occurred when sending sig_term to command processor: {}",
+                e
+            ),
+        }
     })?;
 
     command_emitter.command_execute::<SampleCtrlReq, CommonResp>(SAMPLE_START_REQ)?;

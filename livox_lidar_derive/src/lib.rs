@@ -26,7 +26,7 @@ pub fn check_status_derive(input: TokenStream) -> TokenStream {
                     Ok(())
                 }
                 else {
-                    Err(anyhow!("{} failed ❌, failure status code", stringify!(#name)))
+                    Err(anyhow!("{} failed on checking status code ❌", stringify!(#name)))
                 }
             }
         }
