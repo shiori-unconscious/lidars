@@ -1,0 +1,26 @@
+workspace = { members = ["intelligent_sight_lib"] }
+[package]
+name = "intelligent_sight_rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aya <shioriaya@foxmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+ctrlc = "3.4.4"
+intelligent_sight_lib = { path = "intelligent_sight_lib" }
+env_logger = "0.11.3"
+log = "0.4.21"
+opencv = "0.91.3"
+config = "0.14.0"
+serde = "1.0.202"
+
+[build-dependencies]
+
+[dev-dependencies]
+
+[features]
+visualize = []
+from_video = []

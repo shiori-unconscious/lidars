@@ -1,0 +1,6 @@
+max_detections = 25
+confidence_threshold = 0.5
+iou_threshold = 0.5
+feature_map_size = 6300
+
+camera_exposure_time = 4000 #μs

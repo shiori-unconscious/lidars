@@ -1,2 +1,10 @@
-/target
-/.vscode
+target
+build
+clibs
+Camera
+linuxSDK_V2.1.0.37
+/TensorRT
+/bin
+.xmake
+.vscode
+model.trt
