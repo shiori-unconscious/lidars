@@ -39,6 +39,7 @@ extern "C"
     uint16_t postprocess_init_default();
     uint16_t postprocess(float *input_buffer, float *output_buffer, uint16_t *num_detections);
     uint16_t postprocess_destroy();
+    uint16_t postprocess_classify(float *input_buffer, uint16_t feature_map_size, uint16_t *cls);
 }
 
 struct PostProcess

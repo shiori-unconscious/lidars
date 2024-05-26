@@ -5,7 +5,9 @@ use anyhow::{anyhow, Result};
 use err_code::{CUDA_ERR_NAME, TRT_ERR_NAME};
 use std::mem;
 
-mod cuda_op_ffi {
+mod gpu_op_ffi {
+    use std::ffi::c_char;
+
     extern "C" {
         #[cfg(any(target_os = "windows", target_arch = "aarch64"))]
         pub fn cuda_malloc(size: u32, ptr: *mut *mut u8) -> u16;
@@ -32,12 +34,8 @@ mod cuda_op_ffi {
             width: u32,
             height: u32,
         ) -> u16;
-    }
-}
+    
 
-mod trt_op_ffi {
-    use std::ffi::c_char;
-    extern "C" {
         pub fn create_engine(
             engine_filename: *const c_char,
             input_name: *const c_char,
@@ -63,6 +61,7 @@ mod trt_op_ffi {
             num_detections: *mut u16,
         ) -> u16;
         pub fn postprocess_destroy() -> u16;
+        pub fn postprocess_classify(input_buffer: *const f32, feature_map_size: u16, cls: *mut u16) -> u16;
     }
 }
 
@@ -79,7 +78,7 @@ fn exec_and_check(mut f: impl FnMut() -> Result<u16>) -> Result<()> {
         )),
         err => Err(anyhow!(
             "GPU: Failed, customized error code: {} ({})",
-            err,
+            err,.
             TRT_ERR_NAME
                 .get(err as usize)
                 .unwrap_or(&"err code unknown")
@@ -95,7 +94,7 @@ where
     let mut ptr = std::ptr::null_mut();
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::cuda_malloc(
+            gpu_op_ffi::cuda_malloc(
                 (size * mem::size_of::<T>() / mem::size_of::<u8>()) as u32,
                 &mut ptr as *mut *mut T as *mut *mut u8,
             )
@@ -112,7 +111,7 @@ where
     let mut ptr = std::ptr::null_mut();
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::cuda_malloc_host(
+            gpu_op_ffi::cuda_malloc_host(
                 (size * mem::size_of::<T>() / mem::size_of::<u8>()) as u32,
                 &mut ptr as *mut *mut T as *mut *mut u8,
             )
@@ -129,7 +128,7 @@ where
     let mut ptr = std::ptr::null_mut();
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::cuda_malloc_managed(
+            gpu_op_ffi::cuda_malloc_managed(
                 (size * mem::size_of::<T>() / mem::size_of::<u8>()) as u32,
                 &mut ptr as *mut *mut T as *mut *mut u8,
             )
@@ -139,12 +138,12 @@ where
 }
 
 pub fn cuda_free<T>(ptr: *mut T) -> Result<()> {
-    exec_and_check(|| Ok(unsafe { cuda_op_ffi::cuda_free(ptr as *mut u8) }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::cuda_free(ptr as *mut u8) }))
 }
 
 #[cfg(any(target_os = "windows", target_arch = "aarch64"))]
 pub fn cuda_free_host<T>(ptr: *mut T) -> Result<()> {
-    exec_and_check(|| Ok(unsafe { cuda_op_ffi::cuda_free_host(ptr as *mut u8) }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::cuda_free_host(ptr as *mut u8) }))
 }
 
 pub fn convert_rgb888_3dtensor(
@@ -153,7 +152,7 @@ pub fn convert_rgb888_3dtensor(
 ) -> Result<()> {
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::convert_rgb888_3dtensor(
+            gpu_op_ffi::convert_rgb888_3dtensor(
                 input_image.to_device()?,
                 output_tensor.device()?,
                 input_image.width,
@@ -170,7 +169,7 @@ pub fn transfer_host_to_device<T>(
 ) -> Result<()> {
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::transfer_host_to_device(
+            gpu_op_ffi::transfer_host_to_device(
                 host_buffer as *const u8,
                 device_buffer as *mut u8,
                 (size * mem::size_of::<T>() / mem::size_of::<u8>()) as u32,
@@ -186,7 +185,7 @@ pub fn transfer_device_to_host<T>(
 ) -> Result<()> {
     exec_and_check(|| {
         Ok(unsafe {
-            cuda_op_ffi::transfer_device_to_host(
+            gpu_op_ffi::transfer_device_to_host(
                 host_buffer as *mut u8,
                 device_buffer as *const u8,
                 (size * mem::size_of::<T>() / mem::size_of::<u8>()) as u32,
@@ -207,7 +206,7 @@ pub fn create_engine(
     let output_name = std::ffi::CString::new(output_name)?;
     exec_and_check(|| {
         Ok(unsafe {
-            trt_op_ffi::create_engine(
+            gpu_op_ffi::create_engine(
                 engine_filename.as_ptr(),
                 input_name.as_ptr(),
                 output_name.as_ptr(),
@@ -219,23 +218,23 @@ pub fn create_engine(
 }
 
 pub fn create_context() -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::create_context() }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::create_context() }))
 }
 
 pub fn infer() -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::infer() }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::infer() }))
 }
 
 pub fn release_resources() -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::release_resources() }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::release_resources() }))
 }
 
 pub fn set_input(input_buffer: &mut UnifiedItem<f32>) -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::set_input(input_buffer.to_device()?) }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::set_input(input_buffer.to_device()?) }))
 }
 
 pub fn set_output(output_buffer: &mut UnifiedItem<f32>) -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::set_output(output_buffer.device()?) }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::set_output(output_buffer.device()?) }))
 }
 
 pub fn postprocess_init(
@@ -246,7 +245,7 @@ pub fn postprocess_init(
 ) -> Result<()> {
     exec_and_check(|| {
         Ok(unsafe {
-            trt_op_ffi::postprocess_init(
+            gpu_op_ffi::postprocess_init(
                 max_detect,
                 conf_threshold,
                 iou_threshold,
@@ -257,7 +256,7 @@ pub fn postprocess_init(
 }
 
 pub fn postprocess_init_default() -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::postprocess_init_default() }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::postprocess_init_default() }))
 }
 
 pub fn postprocess(
@@ -267,7 +266,7 @@ pub fn postprocess(
     let mut num_detections = 0;
     exec_and_check(|| {
         Ok(unsafe {
-            trt_op_ffi::postprocess(
+            gpu_op_ffi::postprocess(
                 input_buffer.device()?,
                 output_buffer.host(),
                 &mut num_detections,
@@ -278,7 +277,13 @@ pub fn postprocess(
 }
 
 pub fn postprocess_destroy() -> Result<()> {
-    exec_and_check(|| Ok(unsafe { trt_op_ffi::postprocess_destroy() }))
+    exec_and_check(|| Ok(unsafe { gpu_op_ffi::postprocess_destroy() }))
+}
+
+pub fn postprocess_classify(input_buffer: &mut UnifiedItem<f32>, feature_map_size: u16) -> Result<u8> {
+    let mut cls = 0;
+    exec_and_check(||Ok(unsafe{gpu_op_ffi::postprocess_classify(input_buffer.device()?, feature_map_size, cls.as_mut_ptr());
+    })).map(|_| cls)
 }
 
 #[cfg(test)]

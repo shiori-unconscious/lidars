@@ -72,7 +72,7 @@ __global__ void rgbToTensor(uint8_t *input, float *output)
 
 // assume that input is (640, 480, 3)
 // output is (3, 640, 480)
-// only normalize now
+// only normalize
 uint16_t convert_rgb888_3dtensor(uint8_t *input_buffer, float *output_buffer, uint32_t width, uint32_t height)
 {
     dim3 threads_per_block(16, 16);
